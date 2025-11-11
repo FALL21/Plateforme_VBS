@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PrestatairesService } from './prestataires.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
+import { UpdatePrestataireDto } from './dto/update-prestataire.dto';
 import { SearchPrestatairesDto } from './dto/search-prestataires.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -25,6 +26,29 @@ export class PrestatairesController {
   @ApiOperation({ summary: 'Récupérer mon profil prestataire' })
   async getMyProfile(@Request() req) {
     return this.prestatairesService.findByUserId(req.user.id);
+  }
+
+  // Alias accessible à tout utilisateur authentifié pour vérifier l'existence d'un profil prestataire
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer mon profil prestataire (alias), 404 si inexistant' })
+  async getMyProfileAlias(@Request() req) {
+    const result = await this.prestatairesService.findMyPrestataire(req.user.id);
+    if (!result) {
+      // Harmoniser avec le flux frontend qui attend un 404 si aucun profil n'existe
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+    return result;
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour mon profil prestataire' })
+  async updateMyProfile(@Request() req, @Body() dto: UpdatePrestataireDto) {
+    return this.prestatairesService.updateByUserId(req.user.id, dto);
   }
 
   @Patch('disponibilite')

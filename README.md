@@ -12,7 +12,7 @@
 
 ## 📊 État du Projet
 
-**Dernière mise à jour** : 31 Octobre 2025
+**Dernière mise à jour** : 11 Novembre 2025
 
 ### Progression Globale : 90% 🚀
 
@@ -62,7 +62,8 @@ Plateforme_VBS/
 
 ### Pour les Prestataires
 - ✅ **Création et gestion** de profil professionnel
-- ✅ **Gestion des services** proposés avec tarifs
+- ✅ **Téléversement photo** (caméra ou fichier) avec prévisualisation
+- ✅ **Gestion des services** proposés avec tarifs + création de services personnalisés
 - ✅ **Réception et traitement** des demandes clients
 - ✅ **Gestion de disponibilité**
 - ✅ **Système d'abonnements** (Mensuel/Annuel)
@@ -488,6 +489,12 @@ Merci à tous les contributeurs et aux technologies open-source utilisées :
 - Tests E2E
 - Production deployment
 
+### [0.9.1] - 2025-11-11
+- ✅ Photo de profil prestataire persistante (création & édition)
+- ✅ Mise à jour de l’édition avec cache-busting pour l’aperçu du logo
+- ✅ Services personnalisés sauvegardés automatiquement
+- ✅ Tests end-to-end Playwright pour l’onboarding prestataire
+
 ### [0.9.0] - 2025-10-31
 - ✅ MVP 90% complété
 - ✅ Backend 11 modules fonctionnels
@@ -507,4 +514,4 @@ Merci à tous les contributeurs et aux technologies open-source utilisées :
 
 ---
 
-**Dernière mise à jour** : 31 Octobre 2025 🎃
+**Dernière mise à jour** : 11 Novembre 2025 🎃

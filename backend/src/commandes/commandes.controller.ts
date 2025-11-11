@@ -6,15 +6,13 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Commandes')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('commandes')
 export class CommandesController {
   constructor(private readonly commandesService: CommandesService) {}
 
   @Post('from-contact')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('USER')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Créer une commande EN_COURS après un contact téléphonique' })
   async createFromContact(
     @Request() req,
@@ -28,8 +26,8 @@ export class CommandesController {
   }
 
   @Post('auto-create')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('USER')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Créer automatiquement une commande terminée pour permettre un avis' })
   async autoCreate(
     @Request() req,
@@ -43,24 +41,37 @@ export class CommandesController {
   }
 
   @Get('mes-commandes')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Roles('USER')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Mes commandes (client)' })
   async getMyCommandes(@Request() req) {
     return this.commandesService.getCommandesForUser(req.user.id);
   }
 
+  // Alias pratique: /commandes/me -> même résultat que /commandes/mes-commandes
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Roles('USER')
+  @ApiOperation({ summary: 'Alias: mes commandes (client)' })
+  async getMyCommandesAlias(@Request() req) {
+    return this.commandesService.getCommandesForUser(req.user.id);
+  }
+
   @Get('mes-commandes-prestataire')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Roles('PRESTATAIRE')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Mes commandes (prestataire)' })
   async getMyCommandesPrestataire(@Request() req) {
     return this.commandesService.getCommandesForPrestataire(req.user.id);
   }
 
   @Patch(':id/terminer')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Roles('USER')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Marquer une commande comme terminée (client)' })
   async terminerCommande(
     @Param('id') id: string,
@@ -70,8 +81,9 @@ export class CommandesController {
   }
 
   @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Roles('PRESTATAIRE')
-  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Mettre à jour le statut d\'une commande' })
   async updateStatus(
     @Param('id') id: string,
@@ -79,6 +91,12 @@ export class CommandesController {
     @Request() req,
   ) {
     return this.commandesService.updateStatus(id, body.statut, req.user.id);
+  }
+
+  @Get('prestataire/:prestataireId/recentes')
+  @ApiOperation({ summary: 'Récupérer les dernières commandes terminées d\'un prestataire (public)' })
+  async getCommandesRecentPourPrestataire(@Param('prestataireId') prestataireId: string) {
+    return this.commandesService.getCommandesRecentPourPrestataire(prestataireId);
   }
 
   @Get(':id')

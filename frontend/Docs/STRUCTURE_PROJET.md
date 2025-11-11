@@ -9,7 +9,7 @@
 
 ```
 Plateforme_VBS/
-├── backend/                                    # API NestJS ✅ 95%
+├── backend/                                    # API NestJS ✅ 95% 
 │   ├── dist/                                   # Build compilé
 │   ├── node_modules/
 │   ├── prisma/

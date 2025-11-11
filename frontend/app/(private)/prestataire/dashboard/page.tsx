@@ -222,7 +222,7 @@ export default function PrestataireDashboard() {
 
         {/* Actions rapides */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Link href="/prestataire/create">
+          <Link href="/prestataire/profile/edit">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

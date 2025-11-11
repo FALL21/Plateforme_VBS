@@ -289,7 +289,15 @@ export default function RecherchePage() {
                         )}
                       </div>
                       <img
-                        src={prestataire.logoUrl || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop'}
+                        src={(() => {
+                          const base = prestataire.logoUrl
+                            ? (prestataire.logoUrl.startsWith('/api')
+                                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${prestataire.logoUrl}`
+                                : prestataire.logoUrl)
+                            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop';
+                          const version = (prestataire as any).updatedAt ? new Date((prestataire as any).updatedAt).getTime() : '';
+                          return version ? `${base}${base.includes('?') ? '&' : '?'}v=${version}` : base;
+                        })()}
                         alt={prestataire.raisonSociale}
                         className="w-16 h-16 rounded-full object-cover border"
                         onError={(e) => ((e.currentTarget.src = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop'))}

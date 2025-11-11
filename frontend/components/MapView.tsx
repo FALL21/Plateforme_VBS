@@ -117,7 +117,16 @@ export default function MapView({
         </Marker>
       ))}
       {route && route.length > 1 && (
-        <Polyline positions={route} color="#2563eb" weight={4} opacity={0.85} />
+        <Polyline 
+          positions={route} 
+          pathOptions={{
+            color: '#2563eb',
+            weight: 5,
+            opacity: 0.8,
+            fillColor: '#2563eb',
+            fillOpacity: 0.3,
+          }}
+        />
       )}
       {/* Fit bounds automatiquement pour englober route et marqueurs */}
       <FitBounds route={route} userPosition={userPosition} markers={markers} />

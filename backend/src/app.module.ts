@@ -16,6 +16,7 @@ import { DemandesModule } from './demandes/demandes.module';
 import { CommandesModule } from './commandes/commandes.module';
 import { AvisModule } from './avis/avis.module';
 import { AdminModule } from './admin/admin.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AdminModule } from './admin/admin.module';
     CommandesModule,
     AvisModule,
     AdminModule,
+    FilesModule,
   ],
   providers: [
     {

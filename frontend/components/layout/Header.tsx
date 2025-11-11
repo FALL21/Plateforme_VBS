@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import AuthModal from '@/components/AuthModal';
 
 export default function Header() {
   const { user, isAuthenticated, logout, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -29,10 +31,6 @@ export default function Header() {
           </Link>
           
           <nav className="flex gap-4 items-center">
-            <Link href="/recherche" className="text-gray-700 hover:text-primary">
-              Recherche
-            </Link>
-            
             {mounted && _hasHydrated && isAuthenticated() ? (
               <>
                 {/* Dashboard selon le rôle */}
@@ -64,13 +62,25 @@ export default function Header() {
                 </button>
               </>
             ) : mounted && _hasHydrated ? (
-              <Link href="/login" className="bg-primary text-white px-4 py-2 rounded hover:opacity-90">
-                Connexion
-              </Link>
+              <>
+                <Link 
+                  href="/prestataire/create" 
+                  className="text-gray-700 hover:text-primary font-medium px-3 py-2 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Devenir prestataire
+                </Link>
+                <button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="bg-primary text-white px-4 py-2 rounded hover:opacity-90 transition-opacity font-medium"
+                >
+                  Connexion ou inscription
+                </button>
+              </>
             ) : null}
           </nav>
         </div>
       </div>
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
     </header>
   );
 }

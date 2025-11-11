@@ -259,4 +259,36 @@ export class CommandesService {
       data: { statut: statut as any },
     });
   }
+
+  async getCommandesRecentPourPrestataire(prestataireId: string) {
+    return this.prisma.commande.findMany({
+      where: {
+        prestataireId,
+        statut: 'TERMINEE',
+      },
+      include: {
+        demande: {
+          include: {
+            service: {
+              include: {
+                sousSecteur: {
+                  include: {
+                    secteur: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        avis: {
+          select: {
+            note: true,
+            commentaire: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5, // Les 5 dernières prestations
+    });
+  }
 }

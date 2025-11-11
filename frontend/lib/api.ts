@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// Normalise la baseURL pour garantir la présence de /api
+const rawBase = process.env.NEXT_PUBLIC_API_URL;
+const normalisedBase = rawBase
+  ? `${rawBase.replace(/\/$/, '')}${rawBase.endsWith('/api') ? '' : '/api'}`
+  : 'http://localhost:4000/api';
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: normalisedBase,
   headers: {
     'Content-Type': 'application/json',
   },

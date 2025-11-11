@@ -1,6 +1,31 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Prisma } from '@prisma/client';
+
+const sanitizeEmail = (value?: string | null): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toLowerCase() : undefined;
+};
+
+const normalizePhone = (value?: string | null): string | undefined => {
+  if (!value) return undefined;
+  let phone = value.trim();
+  if (!phone) return undefined;
+  phone = phone.replace(/[^0-9+]/g, '');
+  if (!phone) return undefined;
+  if (phone.startsWith('00')) {
+    phone = `+${phone.slice(2)}`;
+  }
+  if (!phone.startsWith('+')) {
+    if (phone.startsWith('0')) {
+      phone = phone.slice(1);
+    }
+    phone = `+221${phone}`;
+  }
+  return phone;
+};
 
 @Injectable()
 export class UsersService {
@@ -30,19 +55,56 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    return this.prisma.user.update({
-      where: { id },
-      data: dto,
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        role: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-      },
-    });
+    const data: Record<string, unknown> = {};
+
+    if (dto.address !== undefined) {
+      data.address = dto.address?.trim() || null;
+    }
+    if (dto.latitude !== undefined) {
+      data.latitude = dto.latitude;
+    }
+    if (dto.longitude !== undefined) {
+      data.longitude = dto.longitude;
+    }
+    if (dto.email !== undefined) {
+      const sanitized = sanitizeEmail(dto.email);
+      data.email = sanitized ?? null;
+    }
+    if (dto.phone !== undefined) {
+      const normalized = normalizePhone(dto.phone);
+      if (!normalized) {
+        throw new BadRequestException('Le numéro de téléphone est invalide.');
+      }
+      data.phone = normalized;
+    }
+
+    try {
+      return await this.prisma.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          address: true,
+          latitude: true,
+          longitude: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = error.meta?.target as string[] | undefined;
+        if (target?.includes('phone')) {
+          throw new BadRequestException('Ce numéro de téléphone est déjà associé à un autre compte.');
+        }
+        if (target?.includes('email')) {
+          throw new BadRequestException('Cet email est déjà associé à un autre compte.');
+        }
+        throw new BadRequestException('Ces informations sont déjà utilisées par un autre compte.');
+      }
+      throw error;
+    }
   }
 
   // ============ ADMIN METHODS ============

@@ -105,7 +105,13 @@ function AvisForm() {
               <div className="flex items-center gap-4">
                 {commande?.prestataire?.logoUrl && (
                   <img
-                    src={commande.prestataire.logoUrl}
+                    src={(() => {
+                      const raw = commande.prestataire.logoUrl as string;
+                      const base = raw.startsWith('/api')
+                        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${raw}`
+                        : raw;
+                      return `${base}${base.includes('?') ? '&' : '?'}v=${Date.now()}`;
+                    })()}
                     alt={commande.prestataire.raisonSociale}
                     className="w-16 h-16 rounded-full object-cover"
                     onError={(e) => (e.currentTarget.src = '/default-avatar.png')}
