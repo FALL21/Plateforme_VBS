@@ -20,7 +20,7 @@ function Content() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(planId);
   const [plans, setPlans] = useState<any[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'WAVE' | 'ORANGE_MONEY' | 'ESPECES' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'WAVE' | 'ESPECES' | null>(null);
   const [justificatifUrl, setJustificatifUrl] = useState('');
 
   useEffect(() => {
@@ -69,26 +69,19 @@ function Content() {
           abonnementId,
           montant: selectedPlan.prix,
         });
-        // Rediriger vers l'URL de paiement Wave
-        if (paymentRes.data.urlPaiement) {
-          window.location.href = paymentRes.data.urlPaiement;
+        if (paymentRes?.data) {
+          alert('Veuillez valider votre paiement Wave via le numéro 776806767. Un administrateur confirmera votre abonnement sous peu.');
+        } else {
+          alert('Votre demande de paiement Wave a été enregistrée. Veuillez valider le transfert au numéro 776806767. Un administrateur confirmera votre abonnement sous peu.');
         }
-      } else if (paymentMethod === 'ORANGE_MONEY') {
-        const paymentRes = await api.post('/paiements/orange-money/initier', {
-          abonnementId,
-          montant: selectedPlan.prix,
-        });
-        // Rediriger vers l'URL de paiement Orange Money
-        if (paymentRes.data.urlPaiement) {
-          window.location.href = paymentRes.data.urlPaiement;
-        }
+        router.push('/prestataire');
       } else if (paymentMethod === 'ESPECES') {
         await api.post('/paiements/especes', {
           abonnementId,
           montant: selectedPlan.prix,
           justificatifUrl,
         });
-        alert('Paiement en espèces déclaré. Il sera validé par un administrateur sous peu.');
+        alert('Un agent de VBS va bientôt récupérer votre paiement. Un administrateur confirmera votre abonnement une fois le montant reçu.');
         router.push('/prestataire');
       }
     } catch (error: any) {
@@ -165,13 +158,6 @@ function Content() {
                   Wave
                 </Button>
                 <Button
-                  variant={paymentMethod === 'ORANGE_MONEY' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => setPaymentMethod('ORANGE_MONEY')}
-                >
-                  Orange Money
-                </Button>
-                <Button
                   variant={paymentMethod === 'ESPECES' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => setPaymentMethod('ESPECES')}
@@ -181,6 +167,12 @@ function Content() {
               </div>
             </div>
 
+            {paymentMethod === 'WAVE' && (
+              <div className="bg-blue-50 border border-blue-100 text-blue-900 text-sm rounded-md p-4">
+                Envoyez le montant de l’abonnement au numéro <strong>776&nbsp;806&nbsp;767</strong> via Wave. Votre souscription restera en attente jusqu’à validation par un administrateur.
+              </div>
+            )}
+
             {paymentMethod === 'ESPECES' && (
               <div>
                 <label className="block mb-2">URL du justificatif</label>
@@ -189,6 +181,9 @@ function Content() {
                   value={justificatifUrl}
                   onChange={(e) => setJustificatifUrl(e.target.value)}
                 />
+                <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-3">
+                  Un agent VBS prendra contact pour récupérer le paiement en espèces. L’abonnement sera activé après validation administrative.
+                </p>
               </div>
             )}
 
@@ -202,7 +197,7 @@ function Content() {
               </Button>
               <Button
                 onClick={handleCreateAbonnement}
-                disabled={loading || !paymentMethod || (paymentMethod === 'ESPECES' && !justificatifUrl)}
+                disabled={loading || !paymentMethod}
                 className="flex-1"
               >
                 {loading ? 'Traitement...' : 'Confirmer le paiement'}

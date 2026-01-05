@@ -9,6 +9,61 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+const getPublicApiBase = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  return raw.replace(/\/?api\/?$/, '');
+};
+
+const appendCacheBuster = (url: string, updatedAt?: string | Date) => {
+  if (!url) return url;
+  const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+  return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
+};
+
+const normalizeLogoUrl = (url?: string, updatedAt?: string | Date) => {
+  if (!url) return undefined;
+  let normalized = url.trim();
+  if (!normalized) return undefined;
+
+  const base = getPublicApiBase();
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
+    return appendCacheBuster(normalized, updatedAt);
+  }
+
+  if (normalized.startsWith('/api/files/')) {
+    return appendCacheBuster(`${base}${normalized}`, updatedAt);
+  }
+
+  if (normalized.startsWith('/files/')) {
+    return appendCacheBuster(`${base}/api${normalized}`, updatedAt);
+  }
+
+  if (normalized.startsWith('/')) {
+    return appendCacheBuster(`${base}${normalized}`, updatedAt);
+  }
+
+  return appendCacheBuster(`${base}/api/files/${normalized}`, updatedAt);
+};
+
+const getUserDisplayName = (user: any) => {
+  if (user?.prestataire?.raisonSociale) return user.prestataire.raisonSociale;
+  if (user?.email) return user.email;
+  if (user?.phone) return user.phone;
+  return 'Utilisateur';
+};
+
+const getUserAvatar = (user: any) => {
+  const displayName = getUserDisplayName(user);
+
+  if (user?.prestataire?.logoUrl) {
+    const normalized = normalizeLogoUrl(user.prestataire.logoUrl, user.prestataire.updatedAt);
+    if (normalized) return normalized;
+  }
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=0D8ABC&color=fff&size=128`;
+};
+
 export default function UsersManagementPage() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
@@ -62,7 +117,8 @@ export default function UsersManagementPage() {
       filtered = filtered.filter(u => 
         u.email?.toLowerCase().includes(query) ||
         u.phone?.toLowerCase().includes(query) ||
-        u.address?.toLowerCase().includes(query)
+        u.address?.toLowerCase().includes(query) ||
+        u.prestataire?.raisonSociale?.toLowerCase().includes(query)
       );
     }
 
@@ -256,7 +312,28 @@ export default function UsersManagementPage() {
               <div className="space-y-4">
                 {filteredUsers.map((u: any) => (
                   <div key={u.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        {(() => {
+                          const displayName = getUserDisplayName(u);
+                          const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=0D8ABC&color=fff&size=128`;
+                          const avatarUrl = getUserAvatar(u) || fallback;
+                          return (
+                            <img
+                              src={avatarUrl}
+                              alt={displayName}
+                              className="w-16 h-16 rounded-full object-cover border"
+                              data-fallback-applied="false"
+                              onError={(event) => {
+                                const target = event.currentTarget;
+                                if (target.dataset.fallbackApplied === 'true') return;
+                                target.dataset.fallbackApplied = 'true';
+                                target.src = fallback;
+                              }}
+                            />
+                          );
+                        })()}
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(u.role)}`}>
@@ -306,15 +383,14 @@ export default function UsersManagementPage() {
                           <div className="mt-3 p-3 bg-blue-50 rounded text-sm">
                             <p className="font-medium">{u.prestataire.raisonSociale}</p>
                             <p className="text-gray-600 text-xs mt-1">
-                              Services: {u.prestataire.nombreServices || 0} • 
-                              Disponible: {u.prestataire.disponible ? 'Oui' : 'Non'} •
-                              Note: {u.prestataire.noteGlobale || 0}/5
+                              Avis: {u.prestataire.nombreAvis || 0} • 
+                              Note: {(u.prestataire.noteMoyenne || 0).toFixed(1)}/5 •
+                              Disponibilité: {u.prestataire.disponibilite ? 'Oui' : 'Non'}
                             </p>
                           </div>
                         )}
                       </div>
-
-                      <div className="flex flex-col gap-2 ml-4">
+                      <div className="flex flex-col gap-2">
                         <Button
                           size="sm"
                           variant="outline"

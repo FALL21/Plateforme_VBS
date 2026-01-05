@@ -73,10 +73,17 @@ export class AuthService {
       // Créer un nouvel utilisateur
       user = await this.prisma.user.create({
         data: {
-          phone: dto.identifier.includes('+') ? identifier : undefined,
+          phone: dto.identifier.includes('+') || dto.identifier.match(/^\d/) ? identifier : undefined,
           email: dto.identifier.includes('@') ? identifier : undefined,
+          country: dto.country || (dto.identifier.includes('@') ? undefined : 'SN'), // Par défaut Sénégal si téléphone
           actif: true,
         },
+      });
+    } else if (dto.country && !user.country) {
+      // Mettre à jour le pays si l'utilisateur existe mais n'a pas de pays
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { country: dto.country },
       });
     }
 

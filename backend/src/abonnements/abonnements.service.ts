@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAbonnementDto } from './dto/create-abonnement.dto';
+import { TypeAbonnement } from '@prisma/client';
 
 @Injectable()
 export class AbonnementsService {
@@ -14,18 +15,6 @@ export class AbonnementsService {
   }
 
   async create(userId: string, dto: CreateAbonnementDto) {
-    // Vérifier qu'il n'y a pas déjà un abonnement actif
-    const existingActive = await this.prisma.abonnement.findFirst({
-      where: {
-        prestataire: { userId },
-        statut: 'ACTIF',
-      },
-    });
-
-    if (existingActive) {
-      throw new BadRequestException('Vous avez déjà un abonnement actif');
-    }
-
     const prestataire = await this.prisma.prestataire.findUnique({
       where: { userId },
     });
@@ -33,6 +22,8 @@ export class AbonnementsService {
     if (!prestataire) {
       throw new BadRequestException('Vous devez d\'abord créer un profil prestataire');
     }
+
+    await this.ensureNoActiveOrPendingAbonnement(prestataire.id, dto.type as TypeAbonnement);
 
     // Calculer les dates
     const dateDebut = new Date();
@@ -85,7 +76,9 @@ export class AbonnementsService {
     return this.prisma.abonnement.findFirst({
       where: {
         prestataireId: prestataire.id,
-        statut: 'ACTIF',
+        statut: {
+          in: ['EN_ATTENTE', 'ACTIF'],
+        },
       },
       include: {
         plan: true,
@@ -95,6 +88,9 @@ export class AbonnementsService {
           },
           take: 10,
         },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }
@@ -107,11 +103,12 @@ export class AbonnementsService {
       },
     });
 
-    // Activer la visibilité du prestataire
+    // Activer la visibilité du prestataire et sa disponibilité
     await this.prisma.prestataire.update({
       where: { id: abonnement.prestataireId },
       data: {
         abonnementActif: true,
+        disponibilite: true,
       },
     });
 
@@ -145,6 +142,39 @@ export class AbonnementsService {
     }
 
     return expired.length;
+  }
+
+  private async ensureNoActiveOrPendingAbonnement(prestataireId: string, type: TypeAbonnement) {
+    const now = new Date();
+
+    const period =
+      type === TypeAbonnement.MENSUEL
+        ? {
+            start: new Date(now.getFullYear(), now.getMonth(), 1),
+            end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+          }
+        : {
+            start: new Date(now.getFullYear(), 0, 1),
+            end: new Date(now.getFullYear(), 11, 31, 23, 59, 59),
+          };
+
+    const existing = await this.prisma.abonnement.findFirst({
+      where: {
+        prestataireId,
+        type,
+        statut: { in: ['EN_ATTENTE', 'ACTIF'] },
+        dateDebut: { lte: period.end },
+        dateFin: { gte: period.start },
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        type === TypeAbonnement.MENSUEL
+          ? 'Vous avez déjà un abonnement mensuel actif ou en attente pour le mois en cours.'
+          : 'Vous avez déjà un abonnement annuel actif ou en attente pour l\'année en cours.',
+      );
+    }
   }
 }
 

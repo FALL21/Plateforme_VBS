@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +10,40 @@ import ContactPrestataireButton from '@/components/ContactPrestataireButton';
 
 export default function PrestataireDetailPage() {
   const params = useParams();
+  const getPublicApiBase = () => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    return raw.replace(/\/?api\/?$/, '');
+  };
+
+  const appendCacheBuster = (url: string, updatedAt?: string | Date) => {
+    if (!url) return url;
+    const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
+  };
+
+  const normalizeLogoUrl = (url?: string, updatedAt?: string | Date) => {
+    if (!url) return undefined;
+    let normalized = url.replace(/\/+/g, '/');
+    const base = getPublicApiBase();
+    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
+      return appendCacheBuster(normalized, updatedAt);
+    }
+    if (normalized.startsWith('/api/files/')) {
+      return appendCacheBuster(`${base}${normalized}`, updatedAt);
+    }
+    if (normalized.startsWith('/files/')) {
+      return appendCacheBuster(`${base}/api${normalized}`, updatedAt);
+    }
+    if (normalized.startsWith('/')) {
+      return appendCacheBuster(`${base}${normalized}`, updatedAt);
+    }
+    return appendCacheBuster(`${base}/api/files/${normalized}`, updatedAt);
+  };
+
   const [prestataire, setPrestataire] = useState<any>(null);
   const [prestationsRecent, setPrestationsRecent] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
@@ -96,7 +127,8 @@ export default function PrestataireDetailPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('📡 Récupération des données du prestataire...');
+        setError(null);
+        console.log('📡 Récupération des données du prestataire...', { id: params.id });
         const [prestataireRes, prestationsRes] = await Promise.all([
           api.get(`/prestataires/${params.id}`),
           api.get(`/commandes/prestataire/${params.id}/recentes`).catch(() => ({ data: [] })),
@@ -115,10 +147,20 @@ export default function PrestataireDetailPage() {
           localisation: prestataireData?.localisation,
         });
         
+        if (!prestataireData) {
+          setError('Prestataire non trouvé');
+          return;
+        }
+        
         setPrestataire(prestataireData);
         setPrestationsRecent(prestationsRes.data || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Erreur récupération données:', error);
+        const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors du chargement du prestataire';
+        setError(errorMessage);
+        if (error?.response?.status === 404) {
+          setError('Prestataire non trouvé ou compte inactif');
+        }
       } finally {
         setLoading(false);
       }
@@ -126,6 +168,9 @@ export default function PrestataireDetailPage() {
 
     if (params.id) {
       fetchData();
+    } else {
+      setError('ID du prestataire manquant');
+      setLoading(false);
     }
   }, [params.id]);
 
@@ -218,16 +263,49 @@ export default function PrestataireDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8">
-        <div className="max-w-6xl mx-auto">Chargement...</div>
+      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3">
+            <svg className="animate-spin h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-lg text-gray-700">Chargement du prestataire...</span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!prestataire) {
+  if (error || !prestataire) {
     return (
-      <div className="min-h-screen p-8">
-        <div className="max-w-6xl mx-auto">Prestataire non trouvé</div>
+      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-6xl mx-auto">
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader>
+              <CardTitle className="text-red-800">Erreur</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-700 mb-4">
+                {error || 'Prestataire non trouvé'}
+              </p>
+              <p className="text-sm text-red-600 mb-4">
+                {error?.includes('inactif') 
+                  ? 'Ce prestataire n\'est pas actif ou son compte a été désactivé.'
+                  : 'Le prestataire demandé n\'existe pas ou n\'est plus disponible.'}
+              </p>
+              <a
+                href="/"
+                className="inline-flex items-center gap-2 text-primary hover:underline"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Retour à l'accueil
+              </a>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -245,18 +323,16 @@ export default function PrestataireDetailPage() {
                 <CardDescription className="text-lg">{prestataire.description}</CardDescription>
               </div>
                      <img
-                       src={(() => {
-                         const base = prestataire.logoUrl
-                           ? (prestataire.logoUrl.startsWith('/api')
-                               ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${prestataire.logoUrl}`
-                               : prestataire.logoUrl)
-                           : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&auto=format&fit=crop';
-                         const version = prestataire.updatedAt ? new Date(prestataire.updatedAt as any).getTime() : '';
-                         return version ? `${base}${base.includes('?') ? '&' : '?'}v=${version}` : base;
-                       })()}
+                src={
+                  normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
+                }
                 alt={prestataire.raisonSociale}
                 className="w-24 h-24 rounded-full object-cover border"
-                onError={(e) => ((e.currentTarget.src = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&auto=format&fit=crop'))}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src =
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
+                }}
               />
             </div>
           </CardHeader>
@@ -296,6 +372,42 @@ export default function PrestataireDetailPage() {
                             <p className="text-sm text-gray-600">{ps.description}</p>
                           )}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Travaux récents (galerie d'images) */}
+            {prestataire.travauxRecents && prestataire.travauxRecents.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Travaux récents</CardTitle>
+                  <CardDescription>
+                    Quelques exemples de réalisations récentes du prestataire
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                    {prestataire.travauxRecents.map((work: any) => (
+                      <div
+                        key={work.id}
+                        className="relative rounded-lg overflow-hidden bg-gray-100 border hover:shadow-md transition-shadow"
+                      >
+                        <img
+                          src={work.imageUrl}
+                          alt={work.titre || 'Travail récent'}
+                          className="w-full h-32 md:h-40 lg:h-48 object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        {(work.titre || work.description) && (
+                          <div className="absolute inset-x-0 bottom-0 bg-black/45 text-white px-2 py-1 text-xs md:text-sm line-clamp-2">
+                            {work.titre || work.description}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

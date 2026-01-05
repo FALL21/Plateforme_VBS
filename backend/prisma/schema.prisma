@@ -21,6 +21,7 @@ model User {
   passwordHash  String?
   role          UserRole      @default(USER)
   actif         Boolean       @default(true)
+  country       String?       // Code pays ISO (ex: SN, FR, CI, etc.)
   address       String?
   latitude      Float?
   longitude     Float?
@@ -64,6 +65,7 @@ model Prestataire {
   prestataireServices PrestataireService[]
   commandes         Commande[]
   avis              Avis[]
+  travauxRecents    PrestataireWork[]
 
   @@map("prestataires")
   @@index([abonnementActif])
@@ -228,6 +230,20 @@ model PrestataireService {
   @@unique([prestataireId, serviceId])
   @@index([prestataireId])
   @@index([serviceId])
+}
+
+model PrestataireWork {
+  id            String      @id @default(uuid())
+  prestataireId String
+  imageUrl      String
+  titre         String?
+  description   String?
+  createdAt     DateTime   @default(now())
+
+  prestataire   Prestataire @relation(fields: [prestataireId], references: [id], onDelete: Cascade)
+
+  @@map("prestataire_works")
+  @@index([prestataireId, createdAt])
 }
 
 model Demande {

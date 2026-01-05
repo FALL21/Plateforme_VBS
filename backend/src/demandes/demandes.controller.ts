@@ -37,6 +37,14 @@ export class DemandesController {
     return this.demandesService.getDemandesForPrestataire(req.user.id);
   }
 
+  @Get('admin')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: '[ADMIN] Lister toutes les demandes clients' })
+  async getAllDemandesAdmin() {
+    return this.demandesService.findAllAdmin();
+  }
+
   @Patch(':id/accept')
   @Roles('PRESTATAIRE')
   @UseGuards(RolesGuard)

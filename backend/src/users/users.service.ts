@@ -143,6 +143,8 @@ export class UsersService {
             disponibilite: true,
             noteMoyenne: true,
             nombreAvis: true,
+            logoUrl: true,
+            updatedAt: true,
           },
         },
       },

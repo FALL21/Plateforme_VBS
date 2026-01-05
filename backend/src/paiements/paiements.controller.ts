@@ -17,14 +17,6 @@ export class PaiementsController {
     return this.paiementsService.initierWave(body.abonnementId, body.montant);
   }
 
-  @Post('orange-money/initier')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Initier un paiement Orange Money' })
-  async initierOrangeMoney(@Body() body: { abonnementId: string; montant: number }) {
-    return this.paiementsService.initierOrangeMoney(body.abonnementId, body.montant);
-  }
-
   @Post('especes')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

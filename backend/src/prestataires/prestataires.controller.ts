@@ -4,6 +4,7 @@ import { PrestatairesService } from './prestataires.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
 import { UpdatePrestataireDto } from './dto/update-prestataire.dto';
 import { SearchPrestatairesDto } from './dto/search-prestataires.dto';
+import { CreatePrestataireWorkDto } from './dto/create-prestataire-work.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -49,6 +50,15 @@ export class PrestatairesController {
   @ApiOperation({ summary: 'Mettre à jour mon profil prestataire' })
   async updateMyProfile(@Request() req, @Body() dto: UpdatePrestataireDto) {
     return this.prestatairesService.updateByUserId(req.user.id, dto);
+  }
+
+  @Post('travaux')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[PRESTATAIRE] Ajouter un travail récent (image + texte)' })
+  async addTravailRecent(@Request() req, @Body() dto: CreatePrestataireWorkDto) {
+    return this.prestatairesService.addTravailRecent(req.user.id, dto);
   }
 
   @Patch('disponibilite')

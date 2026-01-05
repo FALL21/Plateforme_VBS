@@ -67,6 +67,7 @@ export default function CreatePrestatairePage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   const isAuth = isAuthenticated();
 
@@ -159,11 +160,21 @@ export default function CreatePrestatairePage() {
           if (user) {
             setFormData((prev) => ({
               ...prev,
-              telephone: prev.telephone || user.phone || prev.telephone,
-              email: prev.email || user.email || prev.email,
-              address: prev.address || (user as any).address || prev.address,
-              latitude: prev.latitude ?? (user as any).latitude ?? prev.latitude,
-              longitude: prev.longitude ?? (user as any).longitude ?? prev.longitude,
+              telephone: (user as any).phone ?? prev.telephone,
+              email: (user as any).email ?? prev.email,
+              address: (user as any).address ?? prev.address,
+              latitude:
+                typeof (user as any).latitude === 'number'
+                  ? (user as any).latitude
+                  : prev.latitude ?? 14.7167,
+              longitude:
+                typeof (user as any).longitude === 'number'
+                  ? (user as any).longitude
+                  : prev.longitude ?? -17.4677,
+            }));
+            setUserProfile((prevProfile: any) => ({
+              ...(prevProfile || {}),
+              ...user,
             }));
           }
           // 2) rafraîchir depuis l'API (source de vérité) – essayer plusieurs endpoints
@@ -172,17 +183,28 @@ export default function CreatePrestatairePage() {
           for (const ep of endpoints) {
             try {
               const r = await api.get(ep);
-              if (r?.data) { u = r.data; break; }
+          if (r?.data) {
+            u = r.data;
+            break;
+          }
             } catch (_) { /* essayer suivant */ }
           }
+          if (u && Object.keys(u).length > 0) {
           setFormData((prev) => ({
             ...prev,
-            telephone: prev.telephone || u.phone || prev.telephone,
-            email: prev.email || u.email || prev.email,
-            address: prev.address || u.address || prev.address,
-            latitude: prev.latitude ?? u.latitude ?? prev.latitude,
-            longitude: prev.longitude ?? u.longitude ?? prev.longitude,
+              telephone: u.phone ?? prev.telephone,
+              email: u.email ?? prev.email,
+              address: u.address ?? prev.address,
+              latitude:
+                typeof u.latitude === 'number' ? u.latitude : prev.latitude ?? 14.7167,
+              longitude:
+                typeof u.longitude === 'number' ? u.longitude : prev.longitude ?? -17.4677,
           }));
+            setUserProfile((prevProfile: any) => ({
+              ...(prevProfile || {}),
+              ...u,
+            }));
+          }
         } catch (_) {
           // ignore si endpoint non disponible
         }
@@ -373,7 +395,11 @@ export default function CreatePrestatairePage() {
             <p className="text-xs text-gray-500 text-center">Vous pourrez compléter votre profil en quelques étapes après connexion.</p>
           </CardContent>
         </Card>
-        <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+        <AuthModal
+          open={authModalOpen}
+          onOpenChange={setAuthModalOpen}
+          redirectTo="/prestataire/create"
+        />
       </div>
     );
   }
@@ -631,6 +657,36 @@ Services personnalisés ajoutés : ${customNames.join(', ')}`
   return (
     <div className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-4xl mx-auto">
+          {userProfile && (
+            <Card className="mb-6">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Compte connecté</CardTitle>
+                <CardDescription>
+                  Ces informations ont été importées automatiquement depuis votre profil.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Email</p>
+                  <p className="font-medium">
+                    {formData.email || userProfile.email || 'Non renseigné'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Téléphone</p>
+                  <p className="font-medium">
+                    {formData.telephone || userProfile.phone || 'Non renseigné'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Adresse</p>
+                  <p className="font-medium">
+                    {formData.address || userProfile.address || 'Non renseignée'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         <Card>
           <CardHeader>
             <CardTitle>Créer votre profil prestataire</CardTitle>

@@ -14,6 +14,35 @@ export default function ValidationPrestatairesPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
 
+  const getServiceNames = (prestataire: any): string[] => {
+    const fromRelations =
+      Array.isArray(prestataire?.prestataireServices)
+        ? prestataire.prestataireServices
+            .map((ps: any) => ps?.service?.nom)
+            .filter((nom: string | undefined): nom is string => !!nom?.trim())
+        : [];
+
+    if (fromRelations.length > 0) {
+      return Array.from(new Set(fromRelations));
+    }
+
+    if (typeof prestataire?.description === 'string') {
+      const match = prestataire.description.match(/Services personnalisés ajoutés?\s*:\s*(.+)$/i);
+      if (match && match[1]) {
+        return Array.from(
+          new Set(
+            match[1]
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter((value: string) => value.length > 0),
+          ),
+        );
+      }
+    }
+
+    return [];
+  };
+
   useEffect(() => {
     if (!isAuthenticated() || user?.role !== 'ADMIN') {
       router.push('/login');
@@ -110,7 +139,9 @@ export default function ValidationPrestatairesPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {prestataires.map((prestataire: any) => (
+                {prestataires.map((prestataire: any) => {
+                  const serviceNames = getServiceNames(prestataire);
+                  return (
                   <div key={prestataire.id} className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
@@ -142,10 +173,23 @@ export default function ValidationPrestatairesPage() {
                       <div>
                         <p className="text-sm text-gray-600">Services proposés</p>
                         <p className="font-medium">
-                          {prestataire.prestataireServices?.length || 0} service(s)
+                          {serviceNames.length || 0} service(s)
                         </p>
                       </div>
                     </div>
+
+                    {serviceNames.length > 0 && (
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {serviceNames.map((service: string) => (
+                          <span
+                            key={service}
+                            className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {prestataire.description && (
                       <div className="mb-4 p-3 bg-gray-50 rounded">
@@ -178,7 +222,8 @@ export default function ValidationPrestatairesPage() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

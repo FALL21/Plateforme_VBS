@@ -74,7 +74,7 @@ export default function ValidationPaiementsPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Validation des Paiements</h1>
-            <p className="text-gray-600 mt-2">Paiements en espèces à confirmer</p>
+            <p className="text-gray-600 mt-2">Paiements Wave & espèces à confirmer</p>
           </div>
           <Button onClick={() => router.push('/admin/dashboard')} variant="outline">
             ← Retour au dashboard
@@ -109,7 +109,7 @@ export default function ValidationPaiementsPage() {
           <CardHeader>
             <CardTitle>Paiements en attente de validation</CardTitle>
             <CardDescription>
-              Vérifiez les paiements en espèces et confirmez ou refusez
+              Vérifiez les paiements déclarés et confirmez ou refusez
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -145,12 +145,14 @@ export default function ValidationPaiementsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-gray-600">Méthode de paiement</p>
-                        <p className="font-medium capitalize">{paiement.methodePaiement?.replace('_', ' ')}</p>
+                        <p className="font-medium capitalize">
+                          {paiement.methode?.toLowerCase() === 'wave' ? 'Wave' : 'Espèces'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Date de paiement</p>
                         <p className="font-medium">
-                          {new Date(paiement.datePaiement).toLocaleDateString('fr-FR')}
+                          {paiement.createdAt ? new Date(paiement.createdAt).toLocaleDateString('fr-FR') : '—'}
                         </p>
                       </div>
                       {paiement.abonnement && (
@@ -171,10 +173,24 @@ export default function ValidationPaiementsPage() {
                       )}
                     </div>
 
-                    {paiement.referenceTransaction && (
+                    {paiement.referenceExterne && (
                       <div className="mb-4 p-3 bg-gray-50 rounded">
                         <p className="text-sm text-gray-600">Référence de transaction</p>
-                        <p className="text-sm font-mono mt-1">{paiement.referenceTransaction}</p>
+                        <p className="text-sm font-mono mt-1">{paiement.referenceExterne}</p>
+                      </div>
+                    )}
+
+                    {paiement.justificatifUrl && (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-1">Justificatif</p>
+                        <a
+                          href={paiement.justificatifUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-primary underline"
+                        >
+                          Ouvrir le justificatif
+                        </a>
                       </div>
                     )}
 

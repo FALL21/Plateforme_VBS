@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -11,6 +11,7 @@ export default function PrestataireDashboard() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [prestataire, setPrestataire] = useState<any>(null);
+  const [abonnement, setAbonnement] = useState<any>(null);
   const [stats, setStats] = useState({
     demandesRecues: 0,
     commandesEnCours: 0,
@@ -33,6 +34,14 @@ export default function PrestataireDashboard() {
         // Récupérer le profil prestataire
         const prestataireRes = await api.get('/prestataires/mon-profil');
         setPrestataire(prestataireRes.data);
+
+        // Récupérer l'abonnement actif
+        try {
+          const abonnementRes = await api.get('/abonnements/me');
+          setAbonnement(abonnementRes.data ?? null);
+        } catch {
+          setAbonnement(null);
+        }
 
         // Récupérer les demandes reçues
         const demandesRes = await api.get('/demandes/recues');
@@ -71,6 +80,18 @@ export default function PrestataireDashboard() {
     fetchData();
   }, [isAuthenticated, user, router]);
 
+  const abonnementActif = useMemo(() => {
+    if (!abonnement) return null;
+    return {
+      nom: abonnement?.plan?.nom || (abonnement.type === 'ANNUEL' ? 'Abonnement Annuel' : 'Abonnement Mensuel'),
+      type: abonnement.type,
+      dateDebut: abonnement.dateDebut ? new Date(abonnement.dateDebut) : null,
+      dateFin: abonnement.dateFin ? new Date(abonnement.dateFin) : null,
+      statut: abonnement.statut,
+      tarif: abonnement.tarif,
+    };
+  }, [abonnement]);
+
   const toggleDisponibilite = async () => {
     try {
       await api.patch('/prestataires/disponibilite', {
@@ -91,20 +112,20 @@ export default function PrestataireDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Tableau de bord Prestataire</h1>
-            <p className="text-gray-600 mt-2">{prestataire?.raisonSociale}</p>
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tableau de bord Prestataire</h1>
+            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base truncate">{prestataire?.raisonSociale}</p>
           </div>
           
           {/* Toggle disponibilité */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Disponibilité</span>
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <span className="text-sm text-gray-600 whitespace-nowrap">Disponibilité</span>
             <button
               onClick={toggleDisponibilite}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors flex-shrink-0 ${
                 prestataire?.disponibilite ? 'bg-green-600' : 'bg-gray-300'
               }`}
             >
@@ -117,59 +138,100 @@ export default function PrestataireDashboard() {
           </div>
         </div>
 
-        {/* Alerte abonnement */}
-        {!prestataire?.abonnementActif && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center gap-2">
-              <span className="text-red-600">⚠️</span>
-              <div>
-                <div className="font-medium text-red-900">Abonnement inactif</div>
-                <div className="text-sm text-red-700">
-                  Votre profil n&apos;est pas visible. 
-                  <Link href="/abonnements/plans" className="underline ml-1">
+        {/* Statut abonnement */}
+        {!abonnementActif ? (
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <span className="text-red-600 text-xl sm:text-2xl flex-shrink-0">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-red-900 text-sm sm:text-base">Abonnement inactif</div>
+                <div className="text-xs sm:text-sm text-red-700 mt-1">
+                  Votre profil n&apos;est pas visible.{' '}
+                  <Link href="/abonnements/plans" className="underline font-medium">
                     Souscrire un abonnement
                   </Link>
                 </div>
               </div>
             </div>
           </div>
+        ) : (
+          <Card className="mb-4 sm:mb-6 border-green-200 bg-green-50">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                <span className="text-base sm:text-lg">Mon abonnement actuel</span>
+                <span className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 rounded-full bg-green-600 text-white whitespace-nowrap">
+                  {abonnementActif.statut}
+                </span>
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm mt-1">
+                Visible jusqu&apos;au{' '}
+                {abonnementActif.dateFin
+                  ? abonnementActif.dateFin.toLocaleDateString('fr-FR')
+                  : '—'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div>
+                <p className="text-xs uppercase text-gray-500 mb-1">Plan</p>
+                <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">{abonnementActif.nom}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500 mb-1">Période</p>
+                <p className="text-sm sm:text-base font-semibold text-gray-900">
+                  {abonnementActif.dateDebut
+                    ? abonnementActif.dateDebut.toLocaleDateString('fr-FR')
+                    : '—'}{' '}
+                  →{' '}
+                  {abonnementActif.dateFin
+                    ? abonnementActif.dateFin.toLocaleDateString('fr-FR')
+                    : '—'}
+                </p>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-1">
+                <p className="text-xs uppercase text-gray-500 mb-1">Montant</p>
+                <p className="text-sm sm:text-base font-semibold text-gray-900">
+                  {abonnementActif.tarif ? `${abonnementActif.tarif.toLocaleString('fr-FR')} FCFA` : '—'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-600">Demandes reçues</CardTitle>
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Demandes reçues</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{stats.demandesRecues}</div>
+            <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-primary">{stats.demandesRecues}</div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-600">En cours</CardTitle>
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">En cours</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{stats.commandesEnCours}</div>
+            <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-blue-600">{stats.commandesEnCours}</div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-600">Terminées</CardTitle>
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Terminées</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{stats.commandesTerminees}</div>
+            <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-green-600">{stats.commandesTerminees}</div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-600">Chiffre d&apos;affaire</CardTitle>
+          <Card className="col-span-2 lg:col-span-1">
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Chiffre d&apos;affaire</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
+            <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600 break-words">
                 {stats.chiffreAffaire.toLocaleString('fr-FR')} FCFA
               </div>
             </CardContent>
@@ -177,32 +239,32 @@ export default function PrestataireDashboard() {
         </div>
 
         {/* Réputation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle>Réputation</CardTitle>
-              <CardDescription>Votre note moyenne et avis clients</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Réputation</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Votre note moyenne et avis clients</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="text-5xl font-bold text-yellow-600">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <div className="text-4xl sm:text-5xl font-bold text-yellow-600">
                   {stats.noteMoyenne.toFixed(1)}
                 </div>
                 <div>
-                  <div className="text-yellow-500 text-2xl">★★★★★</div>
-                  <div className="text-sm text-gray-600">{stats.nombreAvis} avis</div>
+                  <div className="text-yellow-500 text-xl sm:text-2xl">★★★★★</div>
+                  <div className="text-xs sm:text-sm text-gray-600">{stats.nombreAvis} avis</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Statut KYC</CardTitle>
-              <CardDescription>Vérification de votre profil</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Statut KYC</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Vérification de votre profil</CardDescription>
             </CardHeader>
-            <CardContent>
-              <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <span className={`inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
                 prestataire?.kycStatut === 'VALIDE' ? 'bg-green-100 text-green-800' :
                 prestataire?.kycStatut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'
@@ -210,7 +272,7 @@ export default function PrestataireDashboard() {
                 {prestataire?.kycStatut || 'NON_SOUMIS'}
               </span>
               {prestataire?.kycStatut !== 'VALIDE' && (
-                <div className="mt-2 text-sm text-gray-600">
+                <div className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600">
                   <Link href="/prestataire/kyc" className="text-primary hover:underline">
                     Compléter la vérification
                   </Link>
@@ -221,14 +283,14 @@ export default function PrestataireDashboard() {
         </div>
 
         {/* Actions rapides */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Link href="/prestataire/profile/edit">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   ⚙️ Gérer mon profil
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Modifier vos informations et services
                 </CardDescription>
               </CardHeader>
@@ -236,25 +298,25 @@ export default function PrestataireDashboard() {
           </Link>
 
           <Link href="/abonnements/plans">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   💳 Mon abonnement
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Gérer votre abonnement et paiements
                 </CardDescription>
               </CardHeader>
             </Card>
           </Link>
 
-          <Link href="/commandes">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+          <Link href="/commandes" className="sm:col-span-2 lg:col-span-1">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   📦 Mes commandes
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Consulter toutes vos commandes
                 </CardDescription>
               </CardHeader>
@@ -264,34 +326,34 @@ export default function PrestataireDashboard() {
 
         {/* Nouvelles demandes */}
         <Card>
-          <CardHeader>
-            <CardTitle>Nouvelles demandes</CardTitle>
-            <CardDescription>Demandes de service reçues</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Nouvelles demandes</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Demandes de service reçues</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {demandes.filter((d: any) => d.statut === 'EN_ATTENTE').length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-6 sm:py-8 text-gray-500 text-sm sm:text-base">
                 Aucune nouvelle demande
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {demandes
                   .filter((d: any) => d.statut === 'EN_ATTENTE')
                   .slice(0, 5)
                   .map((demande: any) => (
-                    <div key={demande.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{demande.service?.nom || 'Service'}</div>
-                        <div className="text-sm text-gray-600">{demande.description}</div>
-                        <div className="text-xs text-gray-500 mt-1">
+                    <div key={demande.id} className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm sm:text-base">{demande.service?.nom || 'Service'}</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">{demande.description}</div>
+                        <div className="text-xs text-gray-500 mt-1.5 sm:mt-2">
                           Client: {demande.utilisateur?.phone} • {new Date(demande.createdAt).toLocaleDateString('fr-FR')}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                      <div className="flex gap-2 sm:flex-shrink-0">
+                        <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 text-white text-xs sm:text-sm rounded hover:bg-green-700 transition-colors">
                           Accepter
                         </button>
-                        <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        <button className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-600 text-white text-xs sm:text-sm rounded hover:bg-red-700 transition-colors">
                           Refuser
                         </button>
                       </div>

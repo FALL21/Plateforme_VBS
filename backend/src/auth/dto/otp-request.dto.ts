@@ -1,11 +1,11 @@
-import { IsNotEmpty, IsString, IsPhoneNumber, IsEmail, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsString, IsPhoneNumber, IsEmail, ValidateIf, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class OtpRequestDto {
   @ApiProperty({ 
     example: '+221771234567 ou 771234567', 
-    description: 'Numéro de téléphone (avec ou sans indicatif +221)' 
+    description: 'Numéro de téléphone (avec ou sans indicatif)' 
   })
   @ValidateIf((o) => !o.email)
   @IsNotEmpty()
@@ -31,5 +31,15 @@ export class OtpRequestDto {
   @IsNotEmpty()
   @IsEmail({}, { message: 'Email invalide' })
   email?: string;
+
+  @ApiProperty({ 
+    example: 'SN', 
+    description: 'Code pays ISO (ex: SN, FR, CI). Requis si phone est fourni.', 
+    required: false 
+  })
+  @ValidateIf((o) => !!o.phone)
+  @IsOptional()
+  @IsString()
+  country?: string;
 }
 

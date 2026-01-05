@@ -6,12 +6,14 @@ import { useRouter, useParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ToastContainer';
 
 export default function UserDetailPage() {
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const params = useParams();
   const userId = params.id as string;
+  const toast = useToast();
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function UserDetailPage() {
       setUser(response.data);
     } catch (error) {
       console.error('Erreur chargement détails utilisateur:', error);
-      alert('Erreur lors du chargement des détails');
+      toast.error('Erreur', 'Erreur lors du chargement des détails');
     } finally {
       setLoading(false);
     }
@@ -203,21 +205,50 @@ export default function UserDetailPage() {
                       {user.prestataire.abonnements.map((abo: any) => (
                         <div key={abo.id} className="p-3 bg-blue-50 rounded">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{abo.plan?.nom}</p>
+                            <div className="flex-1">
+                              <p className="font-medium">{abo.plan?.nom || 'Abonnement personnalisé'}</p>
                               <p className="text-sm text-gray-600">
                                 Du {new Date(abo.dateDebut).toLocaleDateString('fr-FR')} 
                                 {' au '}
                                 {new Date(abo.dateFin).toLocaleDateString('fr-FR')}
                               </p>
+                              {abo.tarif && (
+                                <p className="text-sm text-gray-500 mt-1">
+                                  Montant: {abo.tarif.toLocaleString('fr-FR')} FCFA
+                                </p>
+                              )}
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              abo.statut === 'ACTIF' ? 'bg-green-100 text-green-800' :
-                              abo.statut === 'EXPIRE' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {abo.statut}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                abo.statut === 'ACTIF' ? 'bg-green-100 text-green-800' :
+                                abo.statut === 'EXPIRE' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {abo.statut}
+                              </span>
+                              {abo.statut !== 'ACTIF' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 border-green-300 hover:bg-green-50"
+                                  onClick={async () => {
+                                    if (!confirm(`Êtes-vous sûr de vouloir activer cet abonnement ?\n\nLe prestataire deviendra visible et disponible sur la plateforme.`)) {
+                                      return;
+                                    }
+                                    try {
+                                      await api.patch(`/abonnements/${abo.id}/activate`);
+                                      toast.success('Abonnement activé', 'L\'abonnement a été activé avec succès !');
+                                      fetchUserDetails();
+                                    } catch (error: any) {
+                                      console.error('Erreur activation abonnement:', error);
+                                      toast.error('Erreur', error.response?.data?.message || 'Erreur lors de l\'activation de l\'abonnement');
+                                    }
+                                  }}
+                                >
+                                  ✅ Activer
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}

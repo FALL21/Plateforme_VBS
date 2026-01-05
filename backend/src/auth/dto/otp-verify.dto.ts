@@ -1,11 +1,11 @@
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsNotEmpty, IsString, Length, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class OtpVerifyDto {
   @ApiProperty({ 
     example: '+221771234567 ou 771234567', 
-    description: 'Numéro de téléphone (avec ou sans indicatif +221) ou email' 
+    description: 'Numéro de téléphone (avec ou sans indicatif) ou email' 
   })
   @IsNotEmpty()
   @IsString()
@@ -32,5 +32,14 @@ export class OtpVerifyDto {
   @IsString()
   @Length(6, 6, { message: 'Le code OTP doit contenir 6 chiffres' })
   code: string;
+
+  @ApiProperty({ 
+    example: 'SN', 
+    description: 'Code pays ISO (ex: SN, FR, CI). Requis si identifier est un téléphone.', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
 }
 

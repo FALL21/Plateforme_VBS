@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
 import { UpdatePrestataireDto } from './dto/update-prestataire.dto';
 import { SearchPrestatairesDto, SortOrder } from './dto/search-prestataires.dto';
 import { UserRole } from '@prisma/client';
 import { CustomServiceDto } from './dto/custom-service.dto';
+import { CreatePrestataireWorkDto } from './dto/create-prestataire-work.dto';
 
 const sanitizeEmail = (value?: string | null): string | undefined => {
   if (!value) return undefined;
@@ -79,6 +80,10 @@ export class PrestatairesService {
           include: { plan: true },
           take: 1,
           orderBy: { dateFin: 'desc' },
+        },
+        travauxRecents: {
+          orderBy: { createdAt: 'desc' },
+          take: 12,
         },
       },
     });
@@ -383,6 +388,10 @@ export class PrestatairesService {
             avis: true,
           },
         },
+        travauxRecents: {
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+        },
       },
     });
 
@@ -410,6 +419,10 @@ export class PrestatairesService {
             plan: true,
           },
           take: 1,
+        },
+        travauxRecents: {
+          orderBy: { createdAt: 'desc' },
+          take: 12,
         },
       },
     });
@@ -499,6 +512,36 @@ export class PrestatairesService {
         },
       });
     }
+  }
+
+  async addTravailRecent(userId: string, dto: CreatePrestataireWorkDto) {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { userId },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    if (!dto.imageUrl) {
+      throw new ForbiddenException("L'URL de l'image est obligatoire");
+    }
+
+    await this.prisma.prestataireWork.create({
+      data: {
+        prestataireId: prestataire.id,
+        imageUrl: dto.imageUrl,
+        titre: dto.titre,
+        description: dto.description,
+      },
+    });
+
+    // Retourner la liste mise à jour des travaux récents
+    return this.prisma.prestataireWork.findMany({
+      where: { prestataireId: prestataire.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
   }
 }
 

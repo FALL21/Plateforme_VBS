@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AbonnementsService } from './abonnements.service';
 import { CreateAbonnementDto } from './dto/create-abonnement.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Abonnements')
 @Controller('abonnements')
@@ -29,6 +31,15 @@ export class AbonnementsController {
   @ApiOperation({ summary: 'Récupérer mon abonnement actuel' })
   async getMyAbonnement(@Request() req) {
     return this.abonnementsService.findMyAbonnement(req.user.id);
+  }
+
+  @Patch(':id/activate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Activer un abonnement' })
+  async activateAbonnement(@Param('id') id: string) {
+    return this.abonnementsService.activateAbonnement(id);
   }
 }
 

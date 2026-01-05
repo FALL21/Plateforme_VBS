@@ -48,9 +48,9 @@ export class AdminController {
   }
 
   @Get('paiements/pending')
-  @ApiOperation({ summary: 'Paiements en espèces en attente de validation' })
+  @ApiOperation({ summary: 'Paiements en attente de validation (Wave et espèces)' })
   async getPaiementsPending() {
-    return this.adminService.getPaiementsEspecesEnAttente();
+    return this.adminService.getPaiementsEnAttente();
   }
 
   @Post('paiements/:id/validate')

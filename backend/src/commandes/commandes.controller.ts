@@ -99,6 +99,15 @@ export class CommandesController {
     return this.commandesService.getCommandesRecentPourPrestataire(prestataireId);
   }
 
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Roles('ADMIN')
+  @ApiOperation({ summary: '[ADMIN] Lister toutes les commandes clients' })
+  async getAllCommandesAdmin() {
+    return this.commandesService.getAllForAdmin();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Détails d\'une commande' })
   async findOne(@Param('id') id: string) {

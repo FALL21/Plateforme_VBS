@@ -1,14 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MethodePaiement, StatutPaiement } from '@prisma/client';
+import { MethodePaiement, StatutPaiement, TypeAbonnement } from '@prisma/client';
 
 @Injectable()
 export class PaiementsService {
   constructor(private prisma: PrismaService) {}
 
   async initierWave(abonnementId: string, montant: number) {
-    // TODO: Intégrer l'API Wave
-    // Pour l'instant, on simule
+    await this.ensureAbonnementDisponible(abonnementId, MethodePaiement.WAVE);
     const paiement = await this.prisma.paiement.create({
       data: {
         abonnementId,
@@ -26,26 +25,8 @@ export class PaiementsService {
     };
   }
 
-  async initierOrangeMoney(abonnementId: string, montant: number) {
-    // TODO: Intégrer l'API Orange Money
-    const paiement = await this.prisma.paiement.create({
-      data: {
-        abonnementId,
-        prestataireId: await this.getPrestataireIdFromAbonnement(abonnementId),
-        methode: MethodePaiement.ORANGE_MONEY,
-        montant,
-        statut: StatutPaiement.EN_ATTENTE,
-        referenceExterne: `OM_${Date.now()}`,
-      },
-    });
-
-    return {
-      paiement,
-      urlPaiement: `https://orange-money.com/pay/${paiement.referenceExterne}`, // URL simulée
-    };
-  }
-
   async declarerEspeces(abonnementId: string, montant: number, justificatifUrl: string) {
+    await this.ensureAbonnementDisponible(abonnementId, MethodePaiement.ESPECES);
     const paiement = await this.prisma.paiement.create({
       data: {
         abonnementId,
@@ -92,7 +73,7 @@ export class PaiementsService {
 
       await this.prisma.prestataire.update({
         where: { id: paiement.prestataireId },
-        data: { abonnementActif: true },
+        data: { abonnementActif: true, disponibilite: true },
       });
     }
 
@@ -135,6 +116,74 @@ export class PaiementsService {
     }
 
     return abonnement.prestataireId;
+  }
+
+  private async ensureAbonnementDisponible(abonnementId: string, methode: MethodePaiement) {
+    const abonnement = await this.prisma.abonnement.findUnique({
+      where: { id: abonnementId },
+      include: { plan: true },
+    });
+
+    if (!abonnement) {
+      throw new NotFoundException('Abonnement non trouvé');
+    }
+
+    if (abonnement.statut === 'ACTIF') {
+      throw new BadRequestException('Un abonnement actif existe déjà pour cette période.');
+    }
+
+    const now = new Date();
+
+    const existingPending = await this.prisma.paiement.findFirst({
+      where: {
+        abonnementId,
+        statut: StatutPaiement.EN_ATTENTE,
+        methode,
+      },
+    });
+
+    if (existingPending) {
+      throw new BadRequestException('Un paiement est déjà en attente de validation pour cet abonnement.');
+    }
+
+    const prestataireId = abonnement.prestataireId;
+    const planType = (abonnement.plan?.type || abonnement.type) as TypeAbonnement;
+
+    if (planType === TypeAbonnement.MENSUEL) {
+      const startPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endPeriod = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+      const existingActive = await this.prisma.abonnement.findFirst({
+        where: {
+          prestataireId,
+          type: planType,
+          statut: { in: ['EN_ATTENTE', 'ACTIF'] },
+          dateDebut: { lte: endPeriod },
+          dateFin: { gte: startPeriod },
+        },
+      });
+
+      if (existingActive) {
+        throw new BadRequestException('Vous avez déjà un abonnement mensuel actif ou en attente pour la période en cours.');
+      }
+    } else if (planType === TypeAbonnement.ANNUEL) {
+      const startYear = new Date(now.getFullYear(), 0, 1);
+      const endYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+
+      const existingActive = await this.prisma.abonnement.findFirst({
+        where: {
+          prestataireId,
+          type: planType,
+          statut: { in: ['EN_ATTENTE', 'ACTIF'] },
+          dateDebut: { lte: endYear },
+          dateFin: { gte: startYear },
+        },
+      });
+
+      if (existingActive) {
+        throw new BadRequestException('Vous avez déjà un abonnement annuel actif ou en attente pour l\'année en cours.');
+      }
+    }
   }
 }
 

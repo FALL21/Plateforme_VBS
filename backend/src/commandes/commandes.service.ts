@@ -175,6 +175,34 @@ export class CommandesService {
     });
   }
 
+  async getAllForAdmin() {
+    return this.prisma.commande.findMany({
+      include: {
+        utilisateur: {
+          select: {
+            id: true,
+            phone: true,
+            email: true,
+            address: true,
+          },
+        },
+        prestataire: {
+          select: {
+            id: true,
+            raisonSociale: true,
+          },
+        },
+        demande: {
+          include: {
+            service: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
   async findOne(id: string) {
     const commande = await this.prisma.commande.findUnique({
       where: { id },

@@ -38,6 +38,32 @@ export class DemandesService {
     });
   }
 
+  async findAllAdmin() {
+    return this.prisma.demande.findMany({
+      include: {
+        service: {
+          include: {
+            sousSecteur: {
+              include: {
+                secteur: true,
+              },
+            },
+          },
+        },
+        utilisateur: {
+          select: {
+            id: true,
+            phone: true,
+            email: true,
+            address: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
   async findOne(id: string) {
     const demande = await this.prisma.demande.findUnique({
       where: { id },

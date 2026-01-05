@@ -21,6 +21,8 @@ export default function EditPrestataireProfilePage() {
   });
   const [uploading, setUploading] = useState(false);
   const [logoVersion, setLogoVersion] = useState<number | null>(null);
+  const [travauxRecents, setTravauxRecents] = useState<any[]>([]);
+  const [workUploading, setWorkUploading] = useState(false);
   const [contact, setContact] = useState({
     email: '',
     phone: '',
@@ -52,6 +54,7 @@ export default function EditPrestataireProfilePage() {
           disponibilite: !!p.disponibilite,
         });
         setLogoVersion(p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now());
+        setTravauxRecents(p.travauxRecents || []);
         try {
           const me = await api.get('/users/me');
           setContact({
@@ -158,6 +161,29 @@ export default function EditPrestataireProfilePage() {
     }
   };
 
+  const handleWorkImageUpload = async (file: File) => {
+    if (!file) return;
+    setWorkUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = res.data?.url;
+      if (url) {
+        const travauxRes = await api.post('/prestataires/travaux', {
+          imageUrl: url,
+        });
+        setTravauxRecents(travauxRes.data || []);
+      }
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Erreur lors de l’enregistrement du travail récent');
+    } finally {
+      setWorkUploading(false);
+    }
+  };
+
   const normalizeLogoUrl = (url: string | undefined): string | undefined => {
     if (!url) return undefined;
     let normalized = url.replace(/\/+/g, '/'); // Supprime les slashes multiples
@@ -244,6 +270,36 @@ export default function EditPrestataireProfilePage() {
                   onChange={(e) => e.target.files && handleLogoUpload(e.target.files[0])}
                 />
                 {uploading && <span className="text-xs text-gray-500">Téléversement...</span>}
+              </div>
+            </div>
+
+            {/* Travaux récents */}
+            <div className="pt-4 border-t">
+              <h3 className="text-base font-semibold mb-2">Travaux récents</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Ajoutez quelques photos de vos réalisations récentes pour rassurer les clients.
+              </p>
+              {travauxRecents && travauxRecents.length > 0 && (
+                <div className="mb-3 grid grid-cols-3 gap-3">
+                  {travauxRecents.map((work) => (
+                    <div key={work.id} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-50">
+                      <img
+                        src={work.imageUrl}
+                        alt={work.titre || 'Travail récent'}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <input
+                  id="workFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files && handleWorkImageUpload(e.target.files[0])}
+                />
+                {workUploading && <span className="text-xs text-gray-500">Envoi de l’image...</span>}
               </div>
             </div>
 
