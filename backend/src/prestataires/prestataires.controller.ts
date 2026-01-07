@@ -86,5 +86,23 @@ export class PrestatairesController {
   async findOne(@Param('id') id: string) {
     return this.prestatairesService.findOne(id);
   }
+
+  @Patch(':id/toggle-abonnement')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Activer/Désactiver l\'abonnement d\'un prestataire' })
+  async toggleAbonnement(@Param('id') id: string) {
+    return this.prestatairesService.toggleAbonnement(id);
+  }
+
+  @Patch('me/services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour les services proposés' })
+  async updateServices(@Request() req, @Body() body: { serviceIds: string[] }) {
+    return this.prestatairesService.updateServices(req.user.id, body.serviceIds);
+  }
 }
 

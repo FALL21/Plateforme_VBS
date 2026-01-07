@@ -36,8 +36,9 @@ export class UsersController {
   @ApiOperation({ summary: '[ADMIN] Liste tous les utilisateurs' })
   @ApiQuery({ name: 'role', required: false, description: 'Filtrer par rôle' })
   @ApiQuery({ name: 'search', required: false, description: 'Rechercher par email, téléphone ou adresse' })
-  async findAll(@Query('role') role?: string, @Query('search') search?: string) {
-    return this.usersService.findAll({ role, search });
+  @ApiQuery({ name: 'country', required: false, description: 'Filtrer par pays (code ISO)' })
+  async findAll(@Query('role') role?: string, @Query('search') search?: string, @Query('country') country?: string) {
+    return this.usersService.findAll({ role, search, country });
   }
 
   @Get('stats')

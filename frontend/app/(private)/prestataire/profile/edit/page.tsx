@@ -30,6 +30,10 @@ export default function EditPrestataireProfilePage() {
     latitude: 0,
     longitude: 0,
   });
+  const [secteurs, setSecteurs] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [savingServices, setSavingServices] = useState(false);
 
   const getPublicApiBase = () => {
     const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -55,6 +59,11 @@ export default function EditPrestataireProfilePage() {
         });
         setLogoVersion(p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now());
         setTravauxRecents(p.travauxRecents || []);
+        
+        // Charger les services actuels du prestataire
+        const currentServiceIds = (p.prestataireServices || []).map((ps: any) => ps.serviceId);
+        setSelectedServiceIds(currentServiceIds);
+        
         try {
           const me = await api.get('/users/me');
           setContact({
@@ -65,6 +74,32 @@ export default function EditPrestataireProfilePage() {
             longitude: me.data?.longitude || 0,
           });
         } catch {}
+        
+        // Charger tous les secteurs et services disponibles
+        try {
+          const secteursRes = await api.get('/secteurs');
+          setSecteurs(secteursRes.data || []);
+          
+          // Charger tous les services de tous les secteurs
+          const allServices: any[] = [];
+          for (const secteur of secteursRes.data || []) {
+            try {
+              const sousSecteursRes = await api.get(`/secteurs/${secteur.id}/sous-secteurs`);
+              for (const sousSecteur of sousSecteursRes.data || []) {
+                try {
+                  const servicesRes = await api.get('/services', {
+                    params: { sousSecteur: sousSecteur.id },
+                  });
+                  allServices.push(...(servicesRes.data || []));
+                } catch {}
+              }
+            } catch {}
+          }
+          const uniqueServices = Array.from(new Map(allServices.map((s) => [s.id, s])).values());
+          setServices(uniqueServices);
+        } catch (e) {
+          console.error('Erreur chargement secteurs/services:', e);
+        }
       } catch (e: any) {
         if (e?.response?.status === 404) {
           alert('Aucun profil prestataire trouvé. Créez votre profil.');
@@ -178,10 +213,31 @@ export default function EditPrestataireProfilePage() {
         setTravauxRecents(travauxRes.data || []);
       }
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erreur lors de l’enregistrement du travail récent');
+      alert(e?.response?.data?.message || "Erreur lors de l'enregistrement du travail récent");
     } finally {
       setWorkUploading(false);
     }
+  };
+
+  const handleSaveServices = async () => {
+    setSavingServices(true);
+    try {
+      await api.patch('/prestataires/me/services', {
+        serviceIds: selectedServiceIds,
+      });
+      alert('Services mis à jour avec succès');
+      router.refresh();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Erreur lors de la mise à jour des services');
+    } finally {
+      setSavingServices(false);
+    }
+  };
+
+  const toggleService = (serviceId: string) => {
+    setSelectedServiceIds((prev) =>
+      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
+    );
   };
 
   const normalizeLogoUrl = (url: string | undefined): string | undefined => {
@@ -273,6 +329,55 @@ export default function EditPrestataireProfilePage() {
               </div>
             </div>
 
+            {/* Services proposés */}
+            <div className="pt-4 border-t">
+              <h3 className="text-base font-semibold mb-2">Services proposés</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Sélectionnez les services que vous proposez. Les clients pourront vous trouver via ces services.
+              </p>
+              {services.length > 0 ? (
+                <div className="space-y-4">
+                  {secteurs.map((secteur) => {
+                    const secteurServices = services.filter(
+                      (s) => s.sousSecteur?.secteurId === secteur.id
+                    );
+                    if (secteurServices.length === 0) return null;
+                    
+                    return (
+                      <div key={secteur.id} className="border rounded-lg p-3">
+                        <h4 className="text-sm font-medium mb-2">{secteur.nom}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {secteurServices.map((service) => (
+                            <label
+                              key={service.id}
+                              className="flex items-center gap-2 p-2 rounded border cursor-pointer hover:bg-gray-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedServiceIds.includes(service.id)}
+                                onChange={() => toggleService(service.id)}
+                                className="rounded"
+                              />
+                              <span className="text-sm">{service.nom}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <Button
+                    onClick={handleSaveServices}
+                    disabled={savingServices}
+                    className="w-full sm:w-auto"
+                  >
+                    {savingServices ? 'Enregistrement...' : 'Enregistrer les services'}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Chargement des services...</p>
+              )}
+            </div>
+
             {/* Travaux récents */}
             <div className="pt-4 border-t">
               <h3 className="text-base font-semibold mb-2">Travaux récents</h3>
@@ -299,7 +404,7 @@ export default function EditPrestataireProfilePage() {
                   accept="image/*"
                   onChange={(e) => e.target.files && handleWorkImageUpload(e.target.files[0])}
                 />
-                {workUploading && <span className="text-xs text-gray-500">Envoi de l’image...</span>}
+                {workUploading && <span className="text-xs text-gray-500">Envoi de l'image...</span>}
               </div>
             </div>
 

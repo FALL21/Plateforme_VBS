@@ -62,4 +62,10 @@ export class AdminController {
   ) {
     return this.adminService.validatePaiement(id, body.statut, req.user.id, body.motif);
   }
+
+  @Get('charts')
+  @ApiOperation({ summary: 'Données pour les graphiques et visualisations' })
+  async getChartData() {
+    return this.adminService.getChartData();
+  }
 }

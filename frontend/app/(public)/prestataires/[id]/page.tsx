@@ -215,42 +215,117 @@ export default function PrestataireDetailPage() {
       console.log('🔄 Calcul distance/durée en cours...');
       setCalculatingRoute(true);
       try {
-        // Format OSRM: lng,lat
+        // Vérifier que les coordonnées sont valides
+        if (isNaN(userLocation[0]) || isNaN(userLocation[1]) || isNaN(prestataireLat) || isNaN(prestataireLng)) {
+          console.error('❌ Coordonnées invalides:', { userLocation, prestataireLat, prestataireLng });
+          setDistance(null);
+          setDuration(null);
+          setCalculatingRoute(false);
+          return;
+        }
+
+        // Format OSRM: lng,lat (longitude, latitude)
         const origin = `${userLocation[1]},${userLocation[0]}`;
         const destination = `${prestataireLng},${prestataireLat}`;
-        const url = `https://router.project-osrm.org/route/v1/driving/${origin};${destination}?overview=false`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${origin};${destination}?overview=false&alternatives=false`;
         
-        console.log('🌐 Appel OSRM:', { origin, destination, url });
+        console.log('🌐 Appel OSRM:', { 
+          origin, 
+          destination, 
+          userLocation: `[${userLocation[0]}, ${userLocation[1]}]`,
+          prestataire: `[${prestataireLat}, ${prestataireLng}]`,
+          url 
+        });
         
         const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`OSRM API error: ${res.status}`);
+        }
+        
         const data = await res.json();
         
         console.log('📊 Réponse OSRM:', data);
         
-        if (data?.routes?.[0]) {
+        if (data?.code === 'Ok' && data?.routes?.[0]) {
           // Distance en mètres, convertir en km
           const distanceMeters = data.routes[0].distance;
           const distanceKm = distanceMeters / 1000;
-          setDistance(distanceKm);
           
           // Durée en secondes, convertir en minutes
           const durationSeconds = data.routes[0].duration;
-          const durationMinutes = Math.round(durationSeconds / 60);
+          const durationMinutes = Math.ceil(durationSeconds / 60); // Arrondir vers le haut
+          
+          // Vérifier que les valeurs sont raisonnables (distance > 0, durée > 0)
+          if (distanceKm > 0 && durationMinutes > 0) {
+            setDistance(distanceKm);
+            setDuration(durationMinutes);
+            
+            console.log('✅ Distance et durée calculées:', {
+              distanceMeters,
+              distance: `${distanceKm.toFixed(2)} km`,
+              durationSeconds,
+              duration: `${durationMinutes} min`,
+            });
+          } else {
+            console.warn('⚠️ Valeurs calculées invalides:', { distanceKm, durationMinutes });
+            setDistance(null);
+            setDuration(null);
+          }
+        } else {
+          console.warn('⚠️ Aucune route trouvée dans la réponse OSRM:', data);
+          // Fallback: calcul de distance à vol d'oiseau (Haversine)
+          const toRad = (deg: number) => (deg * Math.PI) / 180;
+          const R = 6371; // Rayon de la Terre en km
+          const dLat = toRad(prestataireLat - userLocation[0]);
+          const dLon = toRad(prestataireLng - userLocation[1]);
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(userLocation[0])) * Math.cos(toRad(prestataireLat)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distanceKm = R * c;
+          
+          // Estimation de la durée basée sur la distance (vitesse moyenne de 15 km/h en ville)
+          const durationMinutes = Math.ceil((distanceKm / 15) * 60);
+          
+          setDistance(distanceKm);
           setDuration(durationMinutes);
           
-          console.log('✅ Distance et durée calculées:', {
+          console.log('✅ Distance et durée calculées (fallback Haversine):', {
             distance: `${distanceKm.toFixed(2)} km`,
             duration: `${durationMinutes} min`,
           });
-        } else {
-          console.warn('⚠️ Aucune route trouvée dans la réponse OSRM');
-          setDistance(null);
-          setDuration(null);
         }
       } catch (e) {
         console.error('❌ Erreur calcul distance/durée:', e);
-        setDistance(null);
-        setDuration(null);
+        // Fallback: calcul de distance à vol d'oiseau (Haversine)
+        try {
+          const toRad = (deg: number) => (deg * Math.PI) / 180;
+          const R = 6371; // Rayon de la Terre en km
+          const dLat = toRad(prestataireLat - userLocation[0]);
+          const dLon = toRad(prestataireLng - userLocation[1]);
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(userLocation[0])) * Math.cos(toRad(prestataireLat)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distanceKm = R * c;
+          
+          // Estimation de la durée basée sur la distance (vitesse moyenne de 15 km/h en ville)
+          const durationMinutes = Math.ceil((distanceKm / 15) * 60);
+          
+          setDistance(distanceKm);
+          setDuration(durationMinutes);
+          
+          console.log('✅ Distance et durée calculées (fallback Haversine après erreur):', {
+            distance: `${distanceKm.toFixed(2)} km`,
+            duration: `${durationMinutes} min`,
+          });
+        } catch (fallbackError) {
+          console.error('❌ Erreur même avec fallback:', fallbackError);
+          setDistance(null);
+          setDuration(null);
+        }
       } finally {
         setCalculatingRoute(false);
       }

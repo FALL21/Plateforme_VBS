@@ -100,6 +100,147 @@ export class AdminService {
     };
   }
 
+  async getChartData() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Données pour graphique d'évolution des inscriptions (30 derniers jours)
+    const usersByDate = await this.prisma.user.findMany({
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      select: {
+        createdAt: true,
+        role: true,
+      },
+    });
+
+    // Grouper par date
+    const dailyUsers: Record<string, { date: string; users: number; prestataires: number; clients: number }> = {};
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      dailyUsers[dateStr] = {
+        date: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+        users: 0,
+        prestataires: 0,
+        clients: 0,
+      };
+    }
+
+    usersByDate.forEach((user) => {
+      const dateStr = user.createdAt.toISOString().split('T')[0];
+      if (dailyUsers[dateStr]) {
+        dailyUsers[dateStr].users++;
+        if (user.role === 'PRESTATAIRE') {
+          dailyUsers[dateStr].prestataires++;
+        } else if (user.role === 'USER') {
+          dailyUsers[dateStr].clients++;
+        }
+      }
+    });
+
+    // Répartition des rôles
+    const [totalClients, totalPrestataires, totalAdmins] = await Promise.all([
+      this.prisma.user.count({ where: { role: 'USER', actif: true } }),
+      this.prisma.user.count({ where: { role: 'PRESTATAIRE', actif: true } }),
+      this.prisma.user.count({ where: { role: 'ADMIN', actif: true } }),
+    ]);
+
+    // Répartition des statuts de commandes
+    const commandesByStatut = await this.prisma.commande.groupBy({
+      by: ['statut'],
+      _count: { statut: true },
+    });
+
+    // Répartition des statuts de demandes
+    const demandesByStatut = await this.prisma.demande.groupBy({
+      by: ['statut'],
+      _count: { statut: true },
+    });
+
+    // CA par mois (6 derniers mois)
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const paiementsByMonth = await this.prisma.paiement.findMany({
+      where: {
+        statut: 'VALIDE',
+        createdAt: { gte: sixMonthsAgo },
+      },
+      select: {
+        createdAt: true,
+        montant: true,
+      },
+    });
+
+    const commandesByMonth = await this.prisma.commande.findMany({
+      where: {
+        statut: 'TERMINEE',
+        createdAt: { gte: sixMonthsAgo },
+      },
+      select: {
+        createdAt: true,
+        prix: true,
+      },
+    });
+
+    const monthlyRevenue: Record<string, { month: string; abonnements: number; commandes: number; total: number }> = {};
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now);
+      date.setMonth(date.getMonth() - i);
+      const monthNum = date.getMonth() + 1;
+      const monthKey = `${date.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+      const monthLabel = date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+      monthlyRevenue[monthKey] = {
+        month: monthLabel,
+        abonnements: 0,
+        commandes: 0,
+        total: 0,
+      };
+    }
+
+    paiementsByMonth.forEach((p) => {
+      const monthNum = p.createdAt.getMonth() + 1;
+      const monthKey = `${p.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+      if (monthlyRevenue[monthKey]) {
+        monthlyRevenue[monthKey].abonnements += p.montant || 0;
+      }
+    });
+
+    commandesByMonth.forEach((c) => {
+      const monthNum = c.createdAt.getMonth() + 1;
+      const monthKey = `${c.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+      if (monthlyRevenue[monthKey]) {
+        monthlyRevenue[monthKey].commandes += c.prix || 0;
+      }
+    });
+
+    Object.keys(monthlyRevenue).forEach((key) => {
+      monthlyRevenue[key].total = monthlyRevenue[key].abonnements + monthlyRevenue[key].commandes;
+    });
+
+    return {
+      dailyUsers: Object.values(dailyUsers),
+      roleDistribution: [
+        { name: 'Clients', value: totalClients, color: '#10b981' },
+        { name: 'Prestataires', value: totalPrestataires, color: '#3b82f6' },
+        { name: 'Admins', value: totalAdmins, color: '#8b5cf6' },
+      ],
+      commandesByStatut: commandesByStatut.map((c) => ({
+        name: c.statut,
+        value: c._count.statut,
+      })),
+      demandesByStatut: demandesByStatut.map((d) => ({
+        name: d.statut,
+        value: d._count.statut,
+      })),
+      monthlyRevenue: Object.values(monthlyRevenue),
+    };
+  }
+
   async getRecentActivities() {
     const activities = await this.prisma.adminAction.findMany({
       take: 20,

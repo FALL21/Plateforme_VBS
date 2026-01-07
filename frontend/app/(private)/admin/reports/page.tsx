@@ -6,11 +6,27 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 export default function ReportsPage() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
+  const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,8 +40,12 @@ export default function ReportsPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/admin/stats');
-      setStats(response.data);
+      const [statsRes, chartsRes] = await Promise.all([
+        api.get('/admin/stats'),
+        api.get('/admin/charts'),
+      ]);
+      setStats(statsRes.data);
+      setChartData(chartsRes.data);
     } catch (error) {
       console.error('Erreur chargement statistiques:', error);
     } finally {
@@ -138,6 +158,111 @@ export default function ReportsPage() {
           </div>
         </div>
 
+        {/* Graphiques */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold mb-4">📈 Visualisations</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Graphique d'évolution des inscriptions */}
+            {chartData?.dailyUsers && chartData.dailyUsers.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Évolution des inscriptions</CardTitle>
+                  <CardDescription>30 derniers jours</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData.dailyUsers}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="users" stroke="#3b82f6" name="Total" strokeWidth={2} />
+                      <Line type="monotone" dataKey="clients" stroke="#10b981" name="Clients" strokeWidth={2} />
+                      <Line type="monotone" dataKey="prestataires" stroke="#8b5cf6" name="Prestataires" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Répartition des rôles */}
+            {chartData?.roleDistribution && chartData.roleDistribution.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Répartition des utilisateurs</CardTitle>
+                  <CardDescription>Par type de compte</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={chartData.roleDistribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {chartData.roleDistribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Répartition des statuts de commandes */}
+            {chartData?.commandesByStatut && chartData.commandesByStatut.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Statuts des commandes</CardTitle>
+                  <CardDescription>Répartition par statut</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData.commandesByStatut}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Évolution du CA */}
+            {chartData?.monthlyRevenue && chartData.monthlyRevenue.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Évolution du chiffre d'affaires</CardTitle>
+                  <CardDescription>6 derniers mois</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData.monthlyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number | undefined) => value ? `${value.toLocaleString('fr-FR')} FCFA` : '0 FCFA'} />
+                      <Legend />
+                      <Bar dataKey="abonnements" stackId="a" fill="#10b981" name="Abonnements" />
+                      <Bar dataKey="commandes" stackId="a" fill="#3b82f6" name="Commandes" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
         {/* Conversions et Performance */}
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4">💰 Performance financière</h2>
@@ -148,20 +273,56 @@ export default function ReportsPage() {
                 <CardDescription>Par source de paiement</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <span className="text-sm font-medium">Abonnements actifs</span>
-                    <span className="text-lg font-bold text-green-600">
-                      {stats?.abonnementsActifs || 0}
-                    </span>
+                {chartData?.monthlyRevenue && chartData.monthlyRevenue.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          {
+                            name: 'Abonnements',
+                            value: chartData.monthlyRevenue.reduce((sum: number, m: any) => sum + m.abonnements, 0),
+                            color: '#10b981',
+                          },
+                          {
+                            name: 'Commandes',
+                            value: chartData.monthlyRevenue.reduce((sum: number, m: any) => sum + m.commandes, 0),
+                            color: '#3b82f6',
+                          },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Abonnements', value: chartData.monthlyRevenue.reduce((sum: number, m: any) => sum + m.abonnements, 0), color: '#10b981' },
+                          { name: 'Commandes', value: chartData.monthlyRevenue.reduce((sum: number, m: any) => sum + m.commandes, 0), color: '#3b82f6' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number | undefined) => value ? `${value.toLocaleString('fr-FR')} FCFA` : '0 FCFA'} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <span className="text-sm font-medium">Abonnements actifs</span>
+                      <span className="text-lg font-bold text-green-600">
+                        {stats?.abonnementsActifs || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <span className="text-sm font-medium">CA Total</span>
+                      <span className="text-lg font-bold text-purple-600">
+                        {(stats?.chiffreAffaireTotal || 0).toLocaleString('fr-FR')} FCFA
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <span className="text-sm font-medium">CA Total</span>
-                    <span className="text-lg font-bold text-purple-600">
-                      {(stats?.chiffreAffaireTotal || 0).toLocaleString('fr-FR')} FCFA
-                    </span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 

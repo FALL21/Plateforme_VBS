@@ -12,7 +12,7 @@ export default function Footer() {
               <span className="text-xl sm:text-2xl font-bold text-primary">VBS</span>
             </Link>
             <p className="text-gray-600 text-sm">
-              Plateforme de services au Sénégal
+              Plateforme de services
             </p>
           </div>
 

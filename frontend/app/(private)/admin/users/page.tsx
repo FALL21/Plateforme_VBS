@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { countries } from '@/lib/countries';
 
 const getPublicApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -72,6 +73,7 @@ export default function UsersManagementPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [countryFilter, setCountryFilter] = useState<string>('ALL');
 
   useEffect(() => {
     if (!isAuthenticated() || user?.role !== 'ADMIN') {
@@ -80,17 +82,18 @@ export default function UsersManagementPage() {
     }
 
     fetchUsers();
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, roleFilter, countryFilter]);
 
   useEffect(() => {
     filterUsers();
-  }, [searchQuery, roleFilter, users]);
+  }, [searchQuery, roleFilter, countryFilter, users]);
 
   const fetchUsers = async () => {
     try {
       const response = await api.get('/users', {
         params: {
           role: roleFilter !== 'ALL' ? roleFilter : undefined,
+          country: countryFilter !== 'ALL' ? countryFilter : undefined,
           search: searchQuery || undefined,
         },
       });
@@ -109,6 +112,11 @@ export default function UsersManagementPage() {
     // Filter by role
     if (roleFilter !== 'ALL') {
       filtered = filtered.filter(u => u.role === roleFilter);
+    }
+
+    // Filter by country
+    if (countryFilter !== 'ALL') {
+      filtered = filtered.filter(u => u.country === countryFilter);
     }
 
     // Filter by search query
@@ -200,6 +208,22 @@ export default function UsersManagementPage() {
     }
   };
 
+  const handleToggleAbonnement = async (prestataireId: string, currentStatus: boolean, userInfo: string) => {
+    const action = currentStatus ? 'désactiver' : 'activer';
+    if (!confirm(`Êtes-vous sûr de vouloir ${action} l'abonnement du prestataire:\n${userInfo}\n\n${currentStatus ? 'Le prestataire ne sera plus visible sur la plateforme.' : 'Le prestataire deviendra visible et disponible sur la plateforme.'}`)) {
+      return;
+    }
+
+    try {
+      await api.patch(`/prestataires/${prestataireId}/toggle-abonnement`);
+      alert(`Abonnement ${currentStatus ? 'désactivé' : 'activé'} avec succès !`);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Erreur changement abonnement:', error);
+      alert(error.response?.data?.message || 'Erreur lors du changement d\'abonnement');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -209,10 +233,10 @@ export default function UsersManagementPage() {
   }
 
   const stats = {
-    total: users.length,
-    admins: users.filter(u => u.role === 'ADMIN').length,
-    prestataires: users.filter(u => u.role === 'PRESTATAIRE').length,
-    clients: users.filter(u => u.role === 'USER').length,
+    total: filteredUsers.length,
+    admins: filteredUsers.filter(u => u.role === 'ADMIN').length,
+    prestataires: filteredUsers.filter(u => u.role === 'PRESTATAIRE').length,
+    clients: filteredUsers.filter(u => u.role === 'USER').length,
   };
 
   return (
@@ -273,7 +297,7 @@ export default function UsersManagementPage() {
             <CardTitle>Filtres</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
                 placeholder="Rechercher par email, téléphone, adresse..."
                 value={searchQuery}
@@ -288,6 +312,19 @@ export default function UsersManagementPage() {
                   <SelectItem value="USER">Clients uniquement</SelectItem>
                   <SelectItem value="PRESTATAIRE">Prestataires uniquement</SelectItem>
                   <SelectItem value="ADMIN">Admins uniquement</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={countryFilter} onValueChange={setCountryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrer par pays" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les pays</SelectItem>
+                  {countries.map((country) => (
+                    <SelectItem key={country.code} value={country.code}>
+                      {country.flag} {country.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -381,7 +418,16 @@ export default function UsersManagementPage() {
 
                         {u.role === 'PRESTATAIRE' && u.prestataire && (
                           <div className="mt-3 p-3 bg-blue-50 rounded text-sm">
-                            <p className="font-medium">{u.prestataire.raisonSociale}</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium">{u.prestataire.raisonSociale}</p>
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                u.prestataire.abonnementActif 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {u.prestataire.abonnementActif ? '✓ Abonnement actif' : '✗ Abonnement inactif'}
+                              </span>
+                            </div>
                             <p className="text-gray-600 text-xs mt-1">
                               Avis: {u.prestataire.nombreAvis || 0} • 
                               Note: {(u.prestataire.noteMoyenne || 0).toFixed(1)}/5 •
@@ -405,6 +451,16 @@ export default function UsersManagementPage() {
                         >
                           🔄 Changer rôle
                         </Button>
+                        {u.role === 'PRESTATAIRE' && u.prestataire && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={u.prestataire.abonnementActif ? 'text-orange-600 border-orange-300 hover:bg-orange-50' : 'text-green-600 border-green-300 hover:bg-green-50'}
+                            onClick={() => handleToggleAbonnement(u.prestataire.id, u.prestataire.abonnementActif, u.prestataire.raisonSociale || u.email || u.phone || 'Prestataire')}
+                          >
+                            {u.prestataire.abonnementActif ? '💳 Désactiver abonnement' : '💳 Activer abonnement'}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"

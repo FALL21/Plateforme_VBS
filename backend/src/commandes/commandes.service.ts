@@ -194,7 +194,15 @@ export class CommandesService {
         },
         demande: {
           include: {
-            service: true,
+            service: {
+              include: {
+                sousSecteur: {
+                  include: {
+                    secteur: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

@@ -109,11 +109,15 @@ export class UsersService {
 
   // ============ ADMIN METHODS ============
 
-  async findAll(filters?: { role?: string; search?: string }) {
+  async findAll(filters?: { role?: string; search?: string; country?: string }) {
     const where: any = {};
 
     if (filters?.role && filters.role !== 'ALL') {
       where.role = filters.role;
+    }
+
+    if (filters?.country && filters.country !== 'ALL') {
+      where.country = filters.country;
     }
 
     if (filters?.search) {
@@ -133,6 +137,7 @@ export class UsersService {
         role: true,
         actif: true,
         address: true,
+        country: true,
         createdAt: true,
         updatedAt: true,
         prestataire: {
@@ -140,6 +145,7 @@ export class UsersService {
             id: true,
             raisonSociale: true,
             kycStatut: true,
+            abonnementActif: true,
             disponibilite: true,
             noteMoyenne: true,
             nombreAvis: true,

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
 import { UpdatePrestataireDto } from './dto/update-prestataire.dto';
@@ -107,6 +107,65 @@ export class PrestatairesService {
     return this.prisma.prestataire.update({
       where: { id: prestataire.id },
       data: { disponibilite },
+    });
+  }
+
+  async toggleAbonnement(prestataireId: string) {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { id: prestataireId },
+      include: {
+        abonnements: {
+          where: {
+            statut: 'ACTIF',
+          },
+          orderBy: { dateFin: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Prestataire non trouvé');
+    }
+
+    const newStatus = !prestataire.abonnementActif;
+
+    // Si on active l'abonnement et qu'il n'y a pas d'abonnement actif, créer un abonnement mensuel par défaut
+    if (newStatus && prestataire.abonnements.length === 0) {
+      // Récupérer le plan mensuel par défaut
+      const planMensuel = await this.prisma.planAbonnement.findFirst({
+        where: {
+          type: 'MENSUEL',
+          actif: true,
+        },
+        orderBy: { prix: 'asc' },
+      });
+
+      // Calculer les dates (1 mois)
+      const dateDebut = new Date();
+      const dateFin = new Date();
+      dateFin.setMonth(dateFin.getMonth() + 1);
+
+      // Créer l'abonnement mensuel
+      await this.prisma.abonnement.create({
+        data: {
+          prestataireId: prestataire.id,
+          planId: planMensuel?.id,
+          type: 'MENSUEL',
+          dateDebut,
+          dateFin,
+          statut: 'ACTIF', // Activé directement par l'admin
+          tarif: planMensuel?.prix || 10000, // Prix par défaut si pas de plan trouvé
+        },
+      });
+    }
+
+    return this.prisma.prestataire.update({
+      where: { id: prestataireId },
+      data: { 
+        abonnementActif: newStatus,
+        disponibilite: newStatus ? true : prestataire.disponibilite, // Si on active l'abonnement, on active aussi la disponibilité
+      },
     });
   }
 
@@ -475,6 +534,59 @@ export class PrestatairesService {
         prestataireServices: {
           include: {
             service: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateServices(userId: string, serviceIds: string[]) {
+    const prestataire = await this.prisma.prestataire.findUnique({ where: { userId } });
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    // Vérifier que tous les services existent et sont actifs
+    const services = await this.prisma.service.findMany({
+      where: {
+        id: { in: serviceIds },
+        actif: true,
+      },
+    });
+
+    if (services.length !== serviceIds.length) {
+      throw new BadRequestException('Un ou plusieurs services sont invalides ou inactifs');
+    }
+
+    // Supprimer les services existants
+    await this.prisma.prestataireService.deleteMany({
+      where: { prestataireId: prestataire.id },
+    });
+
+    // Créer les nouveaux services
+    if (serviceIds.length > 0) {
+      await this.prisma.prestataireService.createMany({
+        data: serviceIds.map((serviceId) => ({
+          prestataireId: prestataire.id,
+          serviceId,
+        })),
+      });
+    }
+
+    return this.prisma.prestataire.findUnique({
+      where: { id: prestataire.id },
+      include: {
+        prestataireServices: {
+          include: {
+            service: {
+              include: {
+                sousSecteur: {
+                  include: {
+                    secteur: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
