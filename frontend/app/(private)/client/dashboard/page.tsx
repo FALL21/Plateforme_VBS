@@ -7,8 +7,11 @@ import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { toastSuccess, toastError } from '@/lib/toast';
 
 const AvisModal = dynamic(() => import('@/components/AvisModal'), { ssr: false });
+const NouvelleDemandeModal = dynamic(() => import('@/components/NouvelleDemandeModal'), { ssr: false });
 
 export default function ClientDashboard() {
   const { user, isAuthenticated } = useAuthStore();
@@ -23,6 +26,8 @@ export default function ClientDashboard() {
   const [commandes, setCommandes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCommandeForAvis, setSelectedCommandeForAvis] = useState<any>(null);
+  const [commandeToCancel, setCommandeToCancel] = useState<any>(null);
+  const [nouvelleDemandeModalOpen, setNouvelleDemandeModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated() || user?.role !== 'USER') {
@@ -64,72 +69,60 @@ export default function ClientDashboard() {
     fetchData();
   }, [isAuthenticated, user, router]);
 
+  const refetchData = async () => {
+    try {
+      const demandesRes = await api.get('/demandes/mes-demandes');
+      setDemandes(demandesRes.data || []);
+
+      const commandesRes = await api.get('/commandes/mes-commandes');
+      setCommandes(commandesRes.data || []);
+
+      const commandesEnCours = commandesRes.data.filter((c: any) => 
+        ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'].includes(c.statut)
+      ).length;
+      const commandesTerminees = commandesRes.data.filter((c: any) => 
+        c.statut === 'TERMINEE'
+      ).length;
+
+      setStats({
+        demandes: demandesRes.data.length,
+        commandesEnCours,
+        commandesTerminees,
+        avisPublies: commandesRes.data.filter((c: any) => c.avis).length,
+      });
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+    }
+  };
+
   const handleTerminerCommande = async (commandeId: string) => {
     try {
       await api.patch(`/commandes/${commandeId}/terminer`);
-      alert('Commande marquée comme terminée !');
-      
-      // Recharger les données
-      const fetchData = async () => {
-        try {
-          const demandesRes = await api.get('/demandes/mes-demandes');
-          setDemandes(demandesRes.data || []);
-
-          const commandesRes = await api.get('/commandes/mes-commandes');
-          setCommandes(commandesRes.data || []);
-
-          const commandesEnCours = commandesRes.data.filter((c: any) => 
-            ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'].includes(c.statut)
-          ).length;
-          const commandesTerminees = commandesRes.data.filter((c: any) => 
-            c.statut === 'TERMINEE'
-          ).length;
-
-          setStats({
-            demandes: demandesRes.data.length,
-            commandesEnCours,
-            commandesTerminees,
-            avisPublies: commandesRes.data.filter((c: any) => c.avis).length,
-          });
-        } catch (error) {
-          console.error('Erreur chargement données:', error);
-        }
-      };
-      fetchData();
+      toastSuccess('Commande terminée', 'Votre commande a été marquée comme terminée.');
+      refetchData();
     } catch (error: any) {
       console.error('Erreur terminer commande:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la terminaison de la commande');
+      toastError('Erreur', error.response?.data?.message || 'Impossible de terminer la commande. Veuillez réessayer.');
+    }
+  };
+
+  const handleAnnulerCommande = async () => {
+    if (!commandeToCancel) return;
+    
+    try {
+      await api.patch(`/commandes/${commandeToCancel.id}/annuler`);
+      toastSuccess('Commande annulée', 'Votre commande a été annulée avec succès.');
+      setCommandeToCancel(null);
+      refetchData();
+    } catch (error: any) {
+      console.error('Erreur annulation commande:', error);
+      toastError('Erreur', error.response?.data?.message || 'Impossible d\'annuler la commande. Veuillez réessayer.');
+      setCommandeToCancel(null);
     }
   };
 
   const handleAvisSuccess = () => {
-    // Recharger les données après avoir laissé un avis
-    const fetchData = async () => {
-      try {
-        const demandesRes = await api.get('/demandes/mes-demandes');
-        setDemandes(demandesRes.data || []);
-
-        const commandesRes = await api.get('/commandes/mes-commandes');
-        setCommandes(commandesRes.data || []);
-
-        const commandesEnCours = commandesRes.data.filter((c: any) => 
-          ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'].includes(c.statut)
-        ).length;
-        const commandesTerminees = commandesRes.data.filter((c: any) => 
-          c.statut === 'TERMINEE'
-        ).length;
-
-        setStats({
-          demandes: demandesRes.data.length,
-          commandesEnCours,
-          commandesTerminees,
-          avisPublies: commandesRes.data.filter((c: any) => c.avis).length,
-        });
-      } catch (error) {
-        console.error('Erreur chargement données:', error);
-      }
-    };
-    fetchData();
+    refetchData();
   };
 
   if (loading) {
@@ -202,18 +195,19 @@ export default function ClientDashboard() {
             </Card>
           </Link>
 
-          <Link href="/demandes/new">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  ➕ Nouvelle demande
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  Créez une demande de service
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
+          <Card 
+            className="hover:shadow-lg transition-shadow cursor-pointer h-full"
+            onClick={() => setNouvelleDemandeModalOpen(true)}
+          >
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                ➕ Nouvelle demande
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Créez une demande de service
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
           <Link href="/demandes" className="sm:col-span-2 lg:col-span-1">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
@@ -291,15 +285,12 @@ export default function ClientDashboard() {
                         <div className="font-medium text-sm sm:text-base">
                           {commande.prestataire?.raisonSociale || 'Prestataire'}
                         </div>
-                        <div className="text-xs sm:text-sm text-gray-600 mt-1">
-                          {commande.prix?.toLocaleString('fr-FR')} FCFA
-                        </div>
                         <div className="text-xs text-gray-500 mt-1.5 sm:mt-2">
                           {new Date(commande.createdAt).toLocaleDateString('fr-FR')}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap self-start sm:self-auto ${
                           commande.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' :
                           commande.statut === 'ACCEPTEE' ? 'bg-blue-100 text-blue-800' :
                           commande.statut === 'EN_COURS' ? 'bg-green-100 text-green-800' :
@@ -307,12 +298,20 @@ export default function ClientDashboard() {
                         }`}>
                           {commande.statut}
                         </span>
-                        <button
-                          onClick={() => handleTerminerCommande(commande.id)}
-                          className="px-3 sm:px-4 py-2 bg-primary text-white rounded-md hover:opacity-90 text-xs sm:text-sm whitespace-nowrap"
-                        >
-                          ✓ Terminer
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setCommandeToCancel(commande)}
+                            className="px-3 sm:px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs sm:text-sm whitespace-nowrap transition-colors"
+                          >
+                            ✕ Annuler
+                          </button>
+                          <button
+                            onClick={() => handleTerminerCommande(commande.id)}
+                            className="px-3 sm:px-4 py-2 bg-primary text-white rounded-md hover:opacity-90 text-xs sm:text-sm whitespace-nowrap"
+                          >
+                            ✓ Terminer
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -343,9 +342,6 @@ export default function ClientDashboard() {
                         <div className="font-medium text-sm sm:text-base">
                           {commande.prestataire?.raisonSociale || 'Prestataire'}
                         </div>
-                        <div className="text-xs sm:text-sm text-gray-600 mt-1">
-                          {commande.prix?.toLocaleString('fr-FR')} FCFA
-                        </div>
                         <div className="text-xs text-gray-500 mt-1.5 sm:mt-2">
                           Terminée le {new Date(commande.updatedAt).toLocaleDateString('fr-FR')}
                         </div>
@@ -369,6 +365,45 @@ export default function ClientDashboard() {
             commande={selectedCommandeForAvis}
             onClose={() => setSelectedCommandeForAvis(null)}
             onSuccess={handleAvisSuccess}
+          />
+        )}
+
+        {/* Modal nouvelle demande */}
+        <NouvelleDemandeModal
+          open={nouvelleDemandeModalOpen}
+          onOpenChange={setNouvelleDemandeModalOpen}
+          onSuccess={refetchData}
+        />
+
+        {/* Modal de confirmation d'annulation */}
+        {commandeToCancel && (
+          <ConfirmDialog
+            open={!!commandeToCancel}
+            onOpenChange={(open) => !open && setCommandeToCancel(null)}
+            title="Annuler la commande"
+            description={
+              <>
+                <div className="space-y-3">
+                  <p className="text-base text-gray-700">
+                    Êtes-vous sûr de vouloir annuler la commande avec <strong className="text-gray-900">{commandeToCancel.prestataire?.raisonSociale || 'ce prestataire'}</strong> ?
+                  </p>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-sm text-gray-600">
+                      Cette action est irréversible. La commande et la demande associée seront annulées.
+                    </p>
+                  </div>
+                </div>
+              </>
+            }
+            confirmText="Confirmer l'annulation"
+            cancelText="Retour"
+            variant="destructive"
+            onConfirm={handleAnnulerCommande}
+            icon={
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            }
           />
         )}
       </div>

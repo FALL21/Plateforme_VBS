@@ -7,6 +7,7 @@ import api from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { toastSuccess, toastError, toastWarning } from '@/lib/toast';
 
 export default function EditPrestataireProfilePage() {
   const router = useRouter();
@@ -102,10 +103,10 @@ export default function EditPrestataireProfilePage() {
         }
       } catch (e: any) {
         if (e?.response?.status === 404) {
-          alert('Aucun profil prestataire trouvé. Créez votre profil.');
+          toastWarning('Profil non trouvé', 'Créez votre profil prestataire pour continuer.');
           router.push('/prestataire/create');
         } else {
-          alert('Erreur lors du chargement du profil');
+          toastError('Erreur', 'Impossible de charger le profil. Veuillez réessayer.');
         }
       } finally {
         setLoading(false);
@@ -124,11 +125,11 @@ export default function EditPrestataireProfilePage() {
         disponibilite: form.disponibilite,
       });
       setLogoVersion(Date.now());
-      alert('Profil mis à jour');
+      toastSuccess('Profil mis à jour', 'Vos modifications ont été enregistrées avec succès.');
       router.refresh();
       router.push('/prestataire/dashboard');
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erreur lors de la mise à jour');
+      toastError('Erreur', e?.response?.data?.message || 'Impossible de mettre à jour le profil. Veuillez réessayer.');
     } finally {
       setSaving(false);
     }
@@ -144,10 +145,10 @@ export default function EditPrestataireProfilePage() {
         latitude: contact.latitude,
         longitude: contact.longitude,
       });
-      alert('Coordonnées mises à jour');
+      toastSuccess('Coordonnées mises à jour', 'Vos coordonnées ont été enregistrées.');
       router.refresh();
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erreur lors de la mise à jour des coordonnées');
+      toastError('Erreur', e?.response?.data?.message || 'Impossible de mettre à jour les coordonnées.');
     } finally {
       setSaving(false);
     }
@@ -155,14 +156,15 @@ export default function EditPrestataireProfilePage() {
 
   const handleUseGeolocation = () => {
     if (!('geolocation' in navigator)) {
-      alert('Géolocalisation non disponible');
+      toastWarning('Géolocalisation non disponible', 'Votre navigateur ne supporte pas la géolocalisation.');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setContact((c) => ({ ...c, latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+        toastSuccess('Position détectée', 'Votre position a été récupérée avec succès.');
       },
-      () => alert('Impossible de récupérer la position'),
+      () => toastError('Erreur', 'Impossible de récupérer votre position. Vérifiez les permissions de votre navigateur.'),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
@@ -190,7 +192,7 @@ export default function EditPrestataireProfilePage() {
         }
       }
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erreur upload logo');
+      toastError('Erreur', e?.response?.data?.message || 'Impossible de téléverser le logo. Veuillez réessayer.');
     } finally {
       setUploading(false);
     }
@@ -213,7 +215,7 @@ export default function EditPrestataireProfilePage() {
         setTravauxRecents(travauxRes.data || []);
       }
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Erreur lors de l'enregistrement du travail récent");
+      toastError('Erreur', e?.response?.data?.message || "Impossible d'ajouter le travail récent. Veuillez réessayer.");
     } finally {
       setWorkUploading(false);
     }
@@ -225,10 +227,10 @@ export default function EditPrestataireProfilePage() {
       await api.patch('/prestataires/me/services', {
         serviceIds: selectedServiceIds,
       });
-      alert('Services mis à jour avec succès');
+      toastSuccess('Services mis à jour', 'Vos services ont été modifiés avec succès.');
       router.refresh();
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erreur lors de la mise à jour des services');
+      toastError('Erreur', e?.response?.data?.message || 'Impossible de mettre à jour les services. Veuillez réessayer.');
     } finally {
       setSavingServices(false);
     }

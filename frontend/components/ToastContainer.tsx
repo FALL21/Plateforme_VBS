@@ -17,9 +17,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none max-w-[calc(100vw-2rem)]">
         {toast.toasts.map((toastItem) => (
-          <div key={toastItem.id} className="pointer-events-auto">
+          <div 
+            key={toastItem.id} 
+            className="pointer-events-auto transform transition-all duration-300 ease-out"
+          >
             <ToastComponent
               {...toastItem}
               onClose={() => toast.removeToast(toastItem.id)}

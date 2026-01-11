@@ -22,6 +22,40 @@ export default function RecherchePage() {
   const [loading, setLoading] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
 
+  // Fonction pour normaliser les URLs de logo
+  const getPublicApiBase = () => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    return raw.replace(/\/?api\/?$/, '');
+  };
+
+  const normalizeLogoUrl = (url: string | undefined, updatedAt?: string | Date) => {
+    if (!url) return undefined;
+    let normalized = url.replace(/\/+/g, '/');
+    const base = getPublicApiBase();
+    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
+      const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+      return `${normalized}${normalized.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    if (normalized.startsWith('/api/files/')) {
+      const full = `${base}${normalized}`;
+      const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    if (normalized.startsWith('/files/')) {
+      const full = `${base}/api${normalized}`;
+      const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    if (normalized.startsWith('/')) {
+      const full = `${base}${normalized}`;
+      const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    const full = `${base}/api/files/${normalized}`;
+    const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+  };
+
   // Filtres
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('');
@@ -289,18 +323,15 @@ export default function RecherchePage() {
                         )}
                       </div>
                       <img
-                        src={(() => {
-                          const base = prestataire.logoUrl
-                            ? (prestataire.logoUrl.startsWith('/api')
-                                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${prestataire.logoUrl}`
-                                : prestataire.logoUrl)
-                            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop';
-                          const version = (prestataire as any).updatedAt ? new Date((prestataire as any).updatedAt).getTime() : '';
-                          return version ? `${base}${base.includes('?') ? '&' : '?'}v=${version}` : base;
-                        })()}
+                        src={
+                          normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
+                        }
                         alt={prestataire.raisonSociale}
                         className="w-16 h-16 rounded-full object-cover border"
-                        onError={(e) => ((e.currentTarget.src = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop'))}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
+                        }}
                       />
                     </div>
                   </CardHeader>

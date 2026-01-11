@@ -80,6 +80,18 @@ export class CommandesController {
     return this.commandesService.terminerCommande(id, req.user.id);
   }
 
+  @Patch(':id/annuler')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Roles('USER')
+  @ApiOperation({ summary: 'Annuler une commande (client)' })
+  async annulerCommande(
+    @Param('id') id: string,
+    @Request() req,
+  ) {
+    return this.commandesService.annulerCommande(id, req.user.id);
+  }
+
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()

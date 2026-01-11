@@ -278,6 +278,58 @@ export class CommandesService {
     });
   }
 
+  async annulerCommande(commandeId: string, userId: string) {
+    // Vérifier que la commande appartient au client
+    const commande = await this.prisma.commande.findUnique({
+      where: { id: commandeId },
+      include: {
+        demande: true,
+      },
+    });
+
+    if (!commande) {
+      throw new NotFoundException('Commande non trouvée');
+    }
+
+    if (commande.utilisateurId !== userId) {
+      throw new BadRequestException('Cette commande ne vous appartient pas');
+    }
+
+    // Vérifier que la commande peut être annulée (pas déjà terminée)
+    if (commande.statut === 'TERMINEE') {
+      throw new BadRequestException('Impossible d\'annuler une commande déjà terminée');
+    }
+
+    if (commande.statut === 'ANNULEE') {
+      throw new BadRequestException('Cette commande est déjà annulée');
+    }
+
+    // Mettre à jour le statut de la commande à ANNULEE
+    await this.prisma.commande.update({
+      where: { id: commandeId },
+      data: { statut: 'ANNULEE' },
+    });
+
+    // Mettre à jour le statut de la demande associée à ANNULEE si elle n'est pas déjà terminée
+    if (commande.demande && commande.demande.statut !== 'ANNULEE' && commande.demande.statut !== 'REFUSEE') {
+      await this.prisma.demande.update({
+        where: { id: commande.demandeId },
+        data: { statut: 'ANNULEE' },
+      });
+    }
+
+    return this.prisma.commande.findUnique({
+      where: { id: commandeId },
+      include: {
+        prestataire: {
+          select: {
+            raisonSociale: true,
+          },
+        },
+      },
+    });
+  }
+
   async updateStatus(commandeId: string, statut: string, userId: string) {
     const prestataire = await this.prisma.prestataire.findUnique({
       where: { userId },

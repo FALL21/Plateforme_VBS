@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth-store';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { toastError, toastSuccess } from '@/lib/toast';
 
 interface ContactPrestataireButtonProps {
   prestataire: any;
@@ -15,6 +17,7 @@ export default function ContactPrestataireButton({ prestataire, size = 'sm' }: C
   const router = useRouter();
   const [contacting, setContacting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const { user, isAuthenticated, _hasHydrated } = useAuthStore();
 
   useEffect(() => {
@@ -29,24 +32,17 @@ export default function ContactPrestataireButton({ prestataire, size = 'sm' }: C
     if (!isAuthenticated()) {
       console.log('👤 Visiteur non connecté - Appel direct sans créer de commande');
       if (prestataire.user?.phone) {
-        // Afficher un message informatif
-        const doCall = confirm(
-          `Vous allez appeler ${prestataire.raisonSociale}.\n\n` +
-          `💡 Conseil : Connectez-vous pour suivre vos commandes et laisser des avis !`
-        );
-        
-        if (doCall) {
-          window.location.href = `tel:${prestataire.user.phone}`;
-        }
+        // Afficher une modale de confirmation moderne
+        setShowConfirmDialog(true);
       } else {
-        alert('Numéro de téléphone non disponible');
+        toastError('Numéro indisponible', 'Le numéro de téléphone de ce prestataire n\'est pas disponible.');
       }
       return;
     }
 
     if (user?.role !== 'USER') {
       console.log('❌ Rôle incorrect:', user?.role);
-      alert('Seuls les clients peuvent créer des commandes');
+      toastError('Action non autorisée', 'Seuls les clients peuvent créer des commandes.');
       return;
     }
 
@@ -60,7 +56,7 @@ export default function ContactPrestataireButton({ prestataire, size = 'sm' }: C
       console.log('🔧 First service:', firstService);
       
       if (!firstService) {
-        alert('Ce prestataire n\'a pas encore configuré ses services');
+        toastError('Services non configurés', 'Ce prestataire n\'a pas encore configuré ses services.');
         setContacting(false);
         return;
       }
@@ -82,23 +78,31 @@ export default function ContactPrestataireButton({ prestataire, size = 'sm' }: C
       });
       console.log('✅ Commande créée:', commandeRes.data);
 
-      // Ouvrir le lien tel: pour appeler le prestataire
-      if (prestataire.user?.phone) {
-        window.location.href = `tel:${prestataire.user.phone}`;
-      }
-
       // Afficher un message de succès
-      alert('Commande créée ! Vous pouvez maintenant appeler le prestataire.');
+      toastSuccess('Commande créée', 'Votre commande a été créée avec succès. Vous pouvez maintenant appeler le prestataire.');
+      
+      // Ouvrir le lien tel: pour appeler le prestataire après un court délai
+      setTimeout(() => {
+        if (prestataire.user?.phone) {
+          window.location.href = `tel:${prestataire.user.phone}`;
+        }
+      }, 500);
       
       // Rediriger vers le dashboard après 1 seconde
       setTimeout(() => {
         router.push('/client/dashboard');
-      }, 1000);
+      }, 1500);
     } catch (error: any) {
       console.error('Erreur lors du contact:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la création de la commande');
+      toastError('Erreur', error.response?.data?.message || 'Impossible de créer la commande. Veuillez réessayer.');
     } finally {
       setContacting(false);
+    }
+  };
+
+  const handleConfirmCall = () => {
+    if (prestataire.user?.phone) {
+      window.location.href = `tel:${prestataire.user.phone}`;
     }
   };
 
@@ -114,12 +118,69 @@ export default function ContactPrestataireButton({ prestataire, size = 'sm' }: C
   }
 
   return (
-    <Button 
-      className={buttonClass} 
-      onClick={handleContact}
-      disabled={contacting}
-    >
-      {contacting ? 'Contact en cours...' : '📞 Contacter'}
-    </Button>
+    <>
+      <Button 
+        className={buttonClass} 
+        onClick={handleContact}
+        disabled={contacting}
+      >
+        {contacting ? 'Contact en cours...' : '📞 Contacter'}
+      </Button>
+      
+      <ConfirmDialog
+        open={showConfirmDialog}
+        onOpenChange={setShowConfirmDialog}
+        title={`Appeler ${prestataire.raisonSociale}`}
+        description={
+          <>
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-base text-gray-800 text-center">
+                  Vous allez appeler <strong className="text-gray-900 font-semibold">{prestataire.raisonSociale}</strong>
+                </p>
+                <p className="text-sm text-gray-500 text-center mt-2">
+                  Votre application de téléphone (FaceTime, Téléphone, etc.) s'ouvrira automatiquement
+                </p>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-200 flex items-center justify-center mt-0.5">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900 mb-1.5">Pourquoi se connecter ?</p>
+                    <ul className="text-sm text-blue-700 leading-relaxed space-y-1.5 list-none">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>Suivre l'historique de vos commandes</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>Laisser des avis sur les prestataires</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>Bénéficier d'un meilleur suivi de vos services</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        confirmText="📞 Appeler maintenant"
+        cancelText="Annuler"
+        onConfirm={handleConfirmCall}
+        icon={
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        }
+      />
+    </>
   );
 }

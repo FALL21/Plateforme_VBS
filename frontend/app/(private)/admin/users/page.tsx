@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { countries } from '@/lib/countries';
+import { toastSuccess, toastError } from '@/lib/toast';
 
 const getPublicApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -165,11 +166,11 @@ export default function UsersManagementPage() {
 
     try {
       await api.patch(`/users/${userId}/role`, { role: newRole });
-      alert(`Rôle modifié avec succès en ${roleLabels[newRole]}`);
+      toastSuccess('Rôle modifié', `Le rôle a été changé en ${roleLabels[newRole]} avec succès.`);
       fetchUsers();
     } catch (error: any) {
       console.error('Erreur changement rôle:', error);
-      alert(error.response?.data?.message || 'Erreur lors du changement de rôle');
+      toastError('Erreur', error.response?.data?.message || 'Impossible de modifier le rôle. Veuillez réessayer.');
     }
   };
 
