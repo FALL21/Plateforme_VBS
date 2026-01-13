@@ -128,4 +128,3 @@ export async function detectUserCountry(): Promise<Country> {
   return getDefaultCountry();
 }
 
-

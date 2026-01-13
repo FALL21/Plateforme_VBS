@@ -93,4 +93,3 @@ export const normalizePhoneByCountry = (phone: string, country: Country): string
   return country.dialCode + digits;
 };
 
-

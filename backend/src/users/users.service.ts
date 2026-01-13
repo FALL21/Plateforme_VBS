@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Prisma } from '@prisma/client';
+import { getCountryConfigByCode } from '../common/countries';
 
 const sanitizeEmail = (value?: string | null): string | undefined => {
   if (!value) return undefined;
@@ -116,20 +117,70 @@ export class UsersService {
       where.role = filters.role;
     }
 
+    // Construire les conditions de pays
+    let countryCondition: any = null;
     if (filters?.country && filters.country !== 'ALL') {
-      where.country = filters.country;
+      const countryConfig = getCountryConfigByCode(filters.country);
+      
+      if (countryConfig) {
+        // Inclure les utilisateurs avec le pays défini OU ceux sans pays mais avec des indices (téléphone ou adresse)
+        const phoneCondition = { phone: { startsWith: countryConfig.dialCode } };
+        
+        // Construire les conditions d'adresse pour ce pays
+        const addressConditions = countryConfig.addressKeywords.map(keyword => ({
+          address: { contains: keyword, mode: 'insensitive' as const }
+        }));
+        
+        countryCondition = {
+          OR: [
+            { country: filters.country },
+            {
+              AND: [
+                { country: null },
+                {
+                  OR: [
+                    phoneCondition,
+                    ...(addressConditions.length > 0 ? addressConditions : [])
+                  ]
+                }
+              ]
+            }
+          ]
+        };
+      } else {
+        // Si le pays n'est pas dans la config, utiliser uniquement le champ country
+        countryCondition = { country: filters.country };
+      }
     }
 
+    // Construire les conditions de recherche
+    let searchCondition: any = null;
     if (filters?.search) {
-      where.OR = [
-        { email: { contains: filters.search, mode: 'insensitive' } },
-        { phone: { contains: filters.search } },
-        { address: { contains: filters.search, mode: 'insensitive' } },
-      ];
+      searchCondition = {
+        OR: [
+          { email: { contains: filters.search, mode: 'insensitive' } },
+          { phone: { contains: filters.search } },
+          { address: { contains: filters.search, mode: 'insensitive' } },
+        ]
+      };
     }
+
+    // Combiner toutes les conditions avec AND
+    const conditions: any[] = [];
+    if (Object.keys(where).length > 0) {
+      conditions.push(where);
+    }
+    if (countryCondition) {
+      conditions.push(countryCondition);
+    }
+    if (searchCondition) {
+      conditions.push(searchCondition);
+    }
+
+    const finalWhere = conditions.length > 1 ? { AND: conditions } : (conditions[0] || {});
 
     return this.prisma.user.findMany({
-      where,
+      where: finalWhere,
       select: {
         id: true,
         email: true,

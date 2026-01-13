@@ -83,11 +83,7 @@ export default function UsersManagementPage() {
     }
 
     fetchUsers();
-  }, [isAuthenticated, user, router, roleFilter, countryFilter]);
-
-  useEffect(() => {
-    filterUsers();
-  }, [searchQuery, roleFilter, countryFilter, users]);
+  }, [isAuthenticated, user, router, roleFilter, countryFilter, searchQuery]);
 
   const fetchUsers = async () => {
     try {
@@ -105,33 +101,6 @@ export default function UsersManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterUsers = () => {
-    let filtered = users;
-
-    // Filter by role
-    if (roleFilter !== 'ALL') {
-      filtered = filtered.filter(u => u.role === roleFilter);
-    }
-
-    // Filter by country
-    if (countryFilter !== 'ALL') {
-      filtered = filtered.filter(u => u.country === countryFilter);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(u => 
-        u.email?.toLowerCase().includes(query) ||
-        u.phone?.toLowerCase().includes(query) ||
-        u.address?.toLowerCase().includes(query) ||
-        u.prestataire?.raisonSociale?.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredUsers(filtered);
   };
 
   const getRoleColor = (role: string) => {

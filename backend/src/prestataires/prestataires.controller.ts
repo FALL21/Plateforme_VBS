@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PrestatairesService } from './prestataires.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
@@ -59,6 +59,24 @@ export class PrestatairesController {
   @ApiOperation({ summary: '[PRESTATAIRE] Ajouter un travail récent (image + texte)' })
   async addTravailRecent(@Request() req, @Body() dto: CreatePrestataireWorkDto) {
     return this.prestatairesService.addTravailRecent(req.user.id, dto);
+  }
+
+  @Delete('travaux/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[PRESTATAIRE] Supprimer un travail récent' })
+  async deleteTravailRecent(@Request() req, @Param('id') id: string) {
+    return this.prestatairesService.deleteTravailRecent(req.user.id, id);
+  }
+
+  @Patch('travaux/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[PRESTATAIRE] Remplacer un travail récent (image + texte)' })
+  async updateTravailRecent(@Request() req, @Param('id') id: string, @Body() dto: CreatePrestataireWorkDto) {
+    return this.prestatairesService.updateTravailRecent(req.user.id, id, dto);
   }
 
   @Patch('disponibilite')

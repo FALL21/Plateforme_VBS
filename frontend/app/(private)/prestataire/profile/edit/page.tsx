@@ -7,6 +7,7 @@ import api from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toastSuccess, toastError, toastWarning } from '@/lib/toast';
 
 export default function EditPrestataireProfilePage() {
@@ -35,6 +36,8 @@ export default function EditPrestataireProfilePage() {
   const [services, setServices] = useState<any[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [savingServices, setSavingServices] = useState(false);
+  const [selectedSecteurId, setSelectedSecteurId] = useState<string | null>(null);
+  const [travailToDelete, setTravailToDelete] = useState<string | null>(null);
 
   const getPublicApiBase = () => {
     const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -198,8 +201,21 @@ export default function EditPrestataireProfilePage() {
     }
   };
 
-  const handleWorkImageUpload = async (file: File) => {
+  const handleWorkImageUpload = async (file: File, travailId?: string) => {
     if (!file) return;
+    
+    // Vérifier le type de fichier
+    if (!file.type.startsWith('image/')) {
+      toastError('Erreur', 'Veuillez sélectionner un fichier image (JPG, PNG, etc.)');
+      return;
+    }
+    
+    // Vérifier la taille (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toastError('Erreur', 'L\'image est trop volumineuse. Taille maximale : 5MB');
+      return;
+    }
+    
     setWorkUploading(true);
     try {
       const formData = new FormData();
@@ -209,15 +225,42 @@ export default function EditPrestataireProfilePage() {
       });
       const url = res.data?.url;
       if (url) {
-        const travauxRes = await api.post('/prestataires/travaux', {
-          imageUrl: url,
-        });
+        let travauxRes;
+        if (travailId) {
+          // Remplacer un travail existant
+          travauxRes = await api.patch(`/prestataires/travaux/${travailId}`, {
+            imageUrl: url,
+          });
+          toastSuccess('Image remplacée', 'L\'image a été remplacée avec succès.');
+        } else {
+          // Ajouter un nouveau travail
+          travauxRes = await api.post('/prestataires/travaux', {
+            imageUrl: url,
+          });
+          toastSuccess('Travail ajouté', 'Votre travail récent a été ajouté avec succès.');
+        }
         setTravauxRecents(travauxRes.data || []);
       }
     } catch (e: any) {
+      console.error('Erreur ajout/remplacement travail récent:', e);
       toastError('Erreur', e?.response?.data?.message || "Impossible d'ajouter le travail récent. Veuillez réessayer.");
     } finally {
       setWorkUploading(false);
+    }
+  };
+
+  const handleDeleteTravail = async () => {
+    if (!travailToDelete) return;
+
+    try {
+      const travauxRes = await api.delete(`/prestataires/travaux/${travailToDelete}`);
+      setTravauxRecents(travauxRes.data || []);
+      setTravailToDelete(null);
+      toastSuccess('Image supprimée', 'L\'image a été supprimée avec succès.');
+    } catch (e: any) {
+      console.error('Erreur suppression travail récent:', e);
+      toastError('Erreur', e?.response?.data?.message || "Impossible de supprimer l'image. Veuillez réessayer.");
+      setTravailToDelete(null);
     }
   };
 
@@ -259,6 +302,37 @@ export default function EditPrestataireProfilePage() {
       return `${base}${normalized}`;
     }
     return `${base}/api/files/${normalized}`;
+  };
+
+  const normalizeImageUrl = (url: string | undefined, updatedAt?: string | Date): string | undefined => {
+    if (!url) return undefined;
+    let normalized = url.trim().replace(/\/+/g, '/');
+    if (!normalized) return undefined;
+    
+    const base = getPublicApiBase();
+    const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    
+    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
+      return `${normalized}${normalized.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/api/files/')) {
+      const full = `${base}${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/files/')) {
+      const full = `${base}/api${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/')) {
+      const full = `${base}${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    const full = `${base}/api/files/${normalized}`;
+    return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
   };
 
   const logoSrc = useMemo(() => {
@@ -334,43 +408,126 @@ export default function EditPrestataireProfilePage() {
             {/* Services proposés */}
             <div className="pt-4 border-t">
               <h3 className="text-base font-semibold mb-2">Services proposés</h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Sélectionnez les services que vous proposez. Les clients pourront vous trouver via ces services.
+              <p className="text-xs text-gray-500 mb-4">
+                Sélectionnez un secteur pour voir les services disponibles, puis choisissez ceux que vous proposez.
               </p>
+              
+              {/* Filtres par secteur */}
+              {secteurs.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <button
+                      onClick={() => setSelectedSecteurId(null)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedSecteurId === null
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Tous les secteurs
+                    </button>
+                    {secteurs.map((secteur) => {
+                      const secteurServices = services.filter(
+                        (s) => s.sousSecteur?.secteurId === secteur.id
+                      );
+                      if (secteurServices.length === 0) return null;
+                      
+                      const selectedCount = secteurServices.filter((s) =>
+                        selectedServiceIds.includes(s.id)
+                      ).length;
+                      
+                      return (
+                        <button
+                          key={secteur.id}
+                          onClick={() => setSelectedSecteurId(secteur.id)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                            selectedSecteurId === secteur.id
+                              ? 'bg-primary text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {secteur.nom}
+                          {selectedCount > 0 && (
+                            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                              selectedSecteurId === secteur.id
+                                ? 'bg-white/20 text-white'
+                                : 'bg-primary text-white'
+                            }`}>
+                              {selectedCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Liste des services filtrés */}
               {services.length > 0 ? (
                 <div className="space-y-4">
-                  {secteurs.map((secteur) => {
-                    const secteurServices = services.filter(
-                      (s) => s.sousSecteur?.secteurId === secteur.id
-                    );
-                    if (secteurServices.length === 0) return null;
-                    
-                    return (
-                      <div key={secteur.id} className="border rounded-lg p-3">
-                        <h4 className="text-sm font-medium mb-2">{secteur.nom}</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {secteurServices.map((service) => (
-                            <label
-                              key={service.id}
-                              className="flex items-center gap-2 p-2 rounded border cursor-pointer hover:bg-gray-50"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedServiceIds.includes(service.id)}
-                                onChange={() => toggleService(service.id)}
-                                className="rounded"
-                              />
-                              <span className="text-sm">{service.nom}</span>
-                            </label>
-                          ))}
+                  {(() => {
+                    // Filtrer les secteurs selon la sélection
+                    const secteursToShow = selectedSecteurId
+                      ? secteurs.filter((s) => s.id === selectedSecteurId)
+                      : secteurs;
+
+                    return secteursToShow.map((secteur) => {
+                      const secteurServices = services.filter(
+                        (s) => s.sousSecteur?.secteurId === secteur.id
+                      );
+                      if (secteurServices.length === 0) return null;
+
+                      return (
+                        <div key={secteur.id} className="border rounded-lg p-4 bg-white">
+                          <h4 className="text-sm font-semibold mb-3 text-gray-900">{secteur.nom}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {secteurServices.map((service) => {
+                              const isSelected = selectedServiceIds.includes(service.id);
+                              return (
+                                <label
+                                  key={service.id}
+                                  className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                                    isSelected
+                                      ? 'bg-primary/10 border-primary border-2'
+                                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleService(service.id)}
+                                    className="rounded w-4 h-4 text-primary focus:ring-primary"
+                                  />
+                                  <span className={`text-sm flex-1 ${
+                                    isSelected ? 'font-medium text-primary' : 'text-gray-700'
+                                  }`}>
+                                    {service.nom}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-primary text-xs">✓</span>
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
+                  
+                  {selectedServiceIds.length > 0 && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>{selectedServiceIds.length}</strong> service{selectedServiceIds.length > 1 ? 's' : ''} sélectionné{selectedServiceIds.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
+                  
                   <Button
                     onClick={handleSaveServices}
                     disabled={savingServices}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto mt-4"
                   >
                     {savingServices ? 'Enregistrement...' : 'Enregistrer les services'}
                   </Button>
@@ -386,28 +543,103 @@ export default function EditPrestataireProfilePage() {
               <p className="text-xs text-gray-500 mb-3">
                 Ajoutez quelques photos de vos réalisations récentes pour rassurer les clients.
               </p>
-              {travauxRecents && travauxRecents.length > 0 && (
-                <div className="mb-3 grid grid-cols-3 gap-3">
-                  {travauxRecents.map((work) => (
-                    <div key={work.id} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-50">
-                      <img
-                        src={work.imageUrl}
-                        alt={work.titre || 'Travail récent'}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
+              {travauxRecents && travauxRecents.length > 0 ? (
+                <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {travauxRecents.map((work) => {
+                    const imageSrc = normalizeImageUrl(work.imageUrl, work.updatedAt || work.createdAt);
+                    return (
+                      <div key={work.id} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-50 group">
+                        <img
+                          src={imageSrc || 'https://via.placeholder.com/300x300?text=Image+non+disponible'}
+                          alt={work.titre || 'Travail récent'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src.includes('placeholder')) return; // Éviter la boucle infinie
+                            target.src = 'https://via.placeholder.com/300x300?text=Image+non+disponible';
+                          }}
+                        />
+                        {work.titre && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {work.titre}
+                          </div>
+                        )}
+                        {/* Boutons d'action au survol */}
+                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <label className="cursor-pointer bg-blue-600 text-white p-1.5 rounded hover:bg-blue-700 transition-colors" title="Remplacer l'image">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleWorkImageUpload(e.target.files[0], work.id);
+                                  e.target.value = '';
+                                }
+                              }}
+                              disabled={workUploading}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            onClick={() => setTravailToDelete(work.id)}
+                            className="bg-red-600 text-white p-1.5 rounded hover:bg-red-700 transition-colors"
+                            title="Supprimer l'image"
+                            disabled={workUploading}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mb-4 p-8 border-2 border-dashed border-gray-300 rounded-lg text-center bg-gray-50">
+                  <p className="text-sm text-gray-500">Aucun travail récent ajouté</p>
+                  <p className="text-xs text-gray-400 mt-1">Ajoutez des photos pour montrer vos réalisations</p>
                 </div>
               )}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <input
-                  id="workFile"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files && handleWorkImageUpload(e.target.files[0])}
-                />
-                {workUploading && <span className="text-xs text-gray-500">Envoi de l'image...</span>}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <label className="cursor-pointer">
+                  <span className={`px-4 py-2 rounded-md transition-opacity inline-block ${
+                    workUploading 
+                      ? 'bg-gray-400 text-white cursor-not-allowed' 
+                      : 'bg-primary text-white hover:opacity-90'
+                  }`}>
+                    {workUploading ? 'Envoi en cours...' : 'Choisir une image'}
+                  </span>
+                  <input
+                    id="workFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleWorkImageUpload(e.target.files[0]);
+                        // Réinitialiser l'input pour permettre de sélectionner le même fichier à nouveau
+                        e.target.value = '';
+                      }
+                    }}
+                    disabled={workUploading}
+                    className="hidden"
+                  />
+                </label>
+                {workUploading && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs text-gray-500">Téléversement en cours...</span>
+                  </div>
+                )}
               </div>
+              {travauxRecents && travauxRecents.length > 0 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  {travauxRecents.length} photo{travauxRecents.length > 1 ? 's' : ''} ajoutée{travauxRecents.length > 1 ? 's' : ''}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -473,6 +705,25 @@ export default function EditPrestataireProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal de confirmation de suppression */}
+        {travailToDelete && (
+          <ConfirmDialog
+            open={!!travailToDelete}
+            onOpenChange={(open) => !open && setTravailToDelete(null)}
+            title="Supprimer l'image"
+            description="Êtes-vous sûr de vouloir supprimer cette image de vos travaux récents ? Cette action est irréversible."
+            confirmText="Supprimer"
+            cancelText="Annuler"
+            variant="destructive"
+            onConfirm={handleDeleteTravail}
+            icon={
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            }
+          />
+        )}
       </div>
     </div>
   );

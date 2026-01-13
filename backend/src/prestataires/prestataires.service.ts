@@ -655,5 +655,80 @@ export class PrestatairesService {
       take: 12,
     });
   }
+
+  async deleteTravailRecent(userId: string, travailId: string) {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { userId },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    // Vérifier que le travail appartient bien au prestataire
+    const travail = await this.prisma.prestataireWork.findFirst({
+      where: {
+        id: travailId,
+        prestataireId: prestataire.id,
+      },
+    });
+
+    if (!travail) {
+      throw new NotFoundException('Travail récent non trouvé');
+    }
+
+    await this.prisma.prestataireWork.delete({
+      where: { id: travailId },
+    });
+
+    // Retourner la liste mise à jour des travaux récents
+    return this.prisma.prestataireWork.findMany({
+      where: { prestataireId: prestataire.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
+  }
+
+  async updateTravailRecent(userId: string, travailId: string, dto: CreatePrestataireWorkDto) {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { userId },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    // Vérifier que le travail appartient bien au prestataire
+    const travail = await this.prisma.prestataireWork.findFirst({
+      where: {
+        id: travailId,
+        prestataireId: prestataire.id,
+      },
+    });
+
+    if (!travail) {
+      throw new NotFoundException('Travail récent non trouvé');
+    }
+
+    if (!dto.imageUrl) {
+      throw new ForbiddenException("L'URL de l'image est obligatoire");
+    }
+
+    await this.prisma.prestataireWork.update({
+      where: { id: travailId },
+      data: {
+        imageUrl: dto.imageUrl,
+        titre: dto.titre,
+        description: dto.description,
+      },
+    });
+
+    // Retourner la liste mise à jour des travaux récents
+    return this.prisma.prestataireWork.findMany({
+      where: { prestataireId: prestataire.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    });
+  }
 }
 

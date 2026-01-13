@@ -40,6 +40,37 @@ export default function PrestataireDetailPage() {
     return appendCacheBuster(`${base}/api/files/${normalized}`, updatedAt);
   };
 
+  const normalizeImageUrl = (url?: string, updatedAt?: string | Date) => {
+    if (!url) return undefined;
+    let normalized = url.trim().replace(/\/+/g, '/');
+    if (!normalized) return undefined;
+    
+    const base = getPublicApiBase();
+    const version = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    
+    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
+      return `${normalized}${normalized.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/api/files/')) {
+      const full = `${base}${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/files/')) {
+      const full = `${base}/api${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    if (normalized.startsWith('/')) {
+      const full = `${base}${normalized}`;
+      return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+    }
+    
+    const full = `${base}/api/files/${normalized}`;
+    return `${full}${full.includes('?') ? '&' : '?'}v=${version}`;
+  };
+
   const [prestataire, setPrestataire] = useState<any>(null);
   const [prestationsRecent, setPrestationsRecent] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +80,7 @@ export default function PrestataireDetailPage() {
   const [duration, setDuration] = useState<number | null>(null);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
   const [selectedPrestation, setSelectedPrestation] = useState<any | null>(null);
+  const [selectedTravail, setSelectedTravail] = useState<any | null>(null);
 
   const getWhatsAppLink = (rawPhone?: string, message?: string) => {
     if (!rawPhone) return '';
@@ -455,7 +487,7 @@ export default function PrestataireDetailPage() {
             )}
 
             {/* Travaux récents (galerie d'images) */}
-            {prestataire.travauxRecents && prestataire.travauxRecents.length > 0 && (
+            {prestataire.travauxRecents && prestataire.travauxRecents.length > 0 ? (
               <Card>
                 <CardHeader>
                   <CardTitle>Travaux récents</CardTitle>
@@ -465,26 +497,58 @@ export default function PrestataireDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                    {prestataire.travauxRecents.map((work: any) => (
-                      <div
-                        key={work.id}
-                        className="relative rounded-lg overflow-hidden bg-gray-100 border hover:shadow-md transition-shadow"
-                      >
-                        <img
-                          src={work.imageUrl}
-                          alt={work.titre || 'Travail récent'}
-                          className="w-full h-32 md:h-40 lg:h-48 object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                        {(work.titre || work.description) && (
-                          <div className="absolute inset-x-0 bottom-0 bg-black/45 text-white px-2 py-1 text-xs md:text-sm line-clamp-2">
-                            {work.titre || work.description}
+                    {prestataire.travauxRecents.map((work: any) => {
+                      const imageSrc = normalizeImageUrl(work.imageUrl, work.createdAt);
+                      return (
+                        <div
+                          key={work.id}
+                          onClick={() => setSelectedTravail(work)}
+                          className="relative rounded-lg overflow-hidden bg-gray-100 border hover:shadow-lg transition-all cursor-pointer group"
+                        >
+                          <img
+                            src={imageSrc || 'https://via.placeholder.com/300x300?text=Image+non+disponible'}
+                            alt={work.titre || 'Travail récent'}
+                            className="w-full h-32 md:h-40 lg:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (target.src.includes('placeholder')) return;
+                              target.src = 'https://via.placeholder.com/300x300?text=Image+non+disponible';
+                            }}
+                          />
+                          {/* Overlay avec icône zoom au survol */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                              </svg>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {(work.titre || work.description) && (
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent text-white px-2 py-2 text-xs md:text-sm">
+                              <p className="font-medium line-clamp-1">{work.titre}</p>
+                              {work.description && (
+                                <p className="text-xs opacity-90 line-clamp-1 mt-0.5">{work.description}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Travaux récents</CardTitle>
+                  <CardDescription>
+                    Quelques exemples de réalisations récentes du prestataire
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">Aucun travail récent disponible</p>
+                    <p className="text-xs text-gray-400 mt-1">Le prestataire n'a pas encore ajouté de photos de ses réalisations</p>
                   </div>
                 </CardContent>
               </Card>
@@ -613,6 +677,47 @@ export default function PrestataireDetailPage() {
                           )}
                         </div>
                       )}
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog pour zoomer sur un travail récent */}
+            <Dialog open={!!selectedTravail} onOpenChange={(open) => !open && setSelectedTravail(null)}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                {selectedTravail && (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>{selectedTravail.titre || 'Travail récent'}</DialogTitle>
+                      {selectedTravail.description && (
+                        <DialogDescription>
+                          {selectedTravail.description}
+                        </DialogDescription>
+                      )}
+                      {selectedTravail.createdAt && (
+                        <DialogDescription className="text-xs text-gray-500">
+                          Ajouté le {new Date(selectedTravail.createdAt).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </DialogDescription>
+                      )}
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="relative w-full">
+                        <img
+                          src={normalizeImageUrl(selectedTravail.imageUrl, selectedTravail.createdAt) || 'https://via.placeholder.com/800x600?text=Image+non+disponible'}
+                          alt={selectedTravail.titre || 'Travail récent'}
+                          className="w-full h-auto rounded-lg object-contain max-h-[70vh] mx-auto"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src.includes('placeholder')) return;
+                            target.src = 'https://via.placeholder.com/800x600?text=Image+non+disponible';
+                          }}
+                        />
+                      </div>
                     </div>
                   </>
                 )}

@@ -245,7 +245,7 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
                     placeholder={
                       detectingCountry 
                         ? 'Détection du pays...' 
-                        : `${selectedCountry.dialCode}771234567`
+                        : '771234567'
                     }
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
