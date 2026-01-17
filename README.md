@@ -1,6 +1,6 @@
 # 🏗️ Plateforme VBS - Vos Besoins Services
 
-> **Progressive Web App (PWA)** de mise en relation entre utilisateurs et prestataires de services au Sénégal
+> **Progressive Web App (PWA)** de mise en relation entre utilisateurs et prestataires de services 
 
 [![NestJS](https://img.shields.io/badge/NestJS-v10-red.svg)](https://nestjs.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
