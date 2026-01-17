@@ -4,9 +4,10 @@ import { AbonnementsController } from './abonnements.controller';
 import { AbonnementsService } from './abonnements.service';
 import { AbonnementJobsService } from './jobs/abonnement-jobs.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
-  imports: [PrismaModule, ScheduleModule],
+  imports: [PrismaModule, ScheduleModule, SmsModule],
   controllers: [AbonnementsController],
   providers: [AbonnementsService, AbonnementJobsService],
   exports: [AbonnementsService],

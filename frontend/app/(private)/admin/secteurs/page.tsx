@@ -65,34 +65,42 @@ export default function SecteursManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestion des Secteurs</h1>
-            <p className="text-gray-600 mt-2">Taxonomie: secteurs, sous-secteurs et services</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Gestion des Secteurs</h1>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">Taxonomie: secteurs, sous-secteurs et services</p>
           </div>
-          <Button onClick={() => router.push('/admin/dashboard')} variant="outline">
+          <Button 
+            onClick={() => router.push('/admin/dashboard')} 
+            variant="outline"
+            className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+          >
             ← Retour au dashboard
           </Button>
         </div>
 
         {/* Création de secteur */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Créer un nouveau secteur</CardTitle>
-            <CardDescription>Ajoutez un secteur d'activité principal</CardDescription>
+        <Card className="mb-6 sm:mb-8 border-2">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Créer un nouveau secteur</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Ajoutez un secteur d'activité principal</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Input
                 placeholder="Nom du secteur (ex: Vente, Services généraux...)"
                 value={newSecteurNom}
                 onChange={(e) => setNewSecteurNom(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateSecteur()}
-                className="flex-1"
+                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
               />
-              <Button onClick={handleCreateSecteur} disabled={creating}>
+              <Button 
+                onClick={handleCreateSecteur} 
+                disabled={creating}
+                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+              >
                 {creating ? 'Création...' : '+ Créer'}
               </Button>
             </div>
@@ -100,27 +108,27 @@ export default function SecteursManagementPage() {
         </Card>
 
         {/* Liste des secteurs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Secteurs existants ({secteurs.length})</CardTitle>
-            <CardDescription>Liste complète des secteurs d'activité</CardDescription>
+        <Card className="border-2">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Secteurs existants ({secteurs.length})</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Liste complète des secteurs d'activité</CardDescription>
           </CardHeader>
           <CardContent>
             {secteurs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Aucun secteur trouvé. Créez-en un ci-dessus.
+              <div className="text-center py-8 sm:py-12 text-gray-500">
+                <p className="text-xs sm:text-sm">Aucun secteur trouvé. Créez-en un ci-dessus.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {secteurs.map((secteur: any) => (
-                  <div key={secteur.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{secteur.nom}</h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                  <div key={secteur.id} className="p-3 sm:p-4 border-2 rounded-lg hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm sm:text-base lg:text-lg break-words">{secteur.nom}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 break-all">
                           ID: {secteur.id}
                         </p>
-                        <div className="mt-2 flex gap-4 text-sm text-gray-500">
+                        <div className="mt-2 flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500">
                           <span>📋 {secteur.sousSecteurs?.length || 0} sous-secteurs</span>
                           <span>🔧 Services associés</span>
                         </div>
@@ -130,6 +138,7 @@ export default function SecteursManagementPage() {
                           variant="outline" 
                           size="sm"
                           onClick={() => router.push(`/admin/secteurs/${secteur.id}`)}
+                          className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
                         >
                           Gérer
                         </Button>
@@ -143,16 +152,16 @@ export default function SecteursManagementPage() {
         </Card>
 
         {/* Info */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>ℹ️ Information</CardTitle>
+        <Card className="mt-6 sm:mt-8 border-2">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">ℹ️ Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs sm:text-sm text-gray-600">
               Les secteurs permettent d'organiser les services proposés sur la plateforme.
               Chaque secteur peut contenir plusieurs sous-secteurs, qui eux-mêmes contiennent des services spécifiques.
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-xs sm:text-sm text-gray-600 mt-2">
               <strong>Exemple :</strong> Secteur "Vente" → Sous-secteur "Alimentaire" → Service "Produits alimentaires"
             </p>
           </CardContent>

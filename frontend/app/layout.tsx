@@ -21,9 +21,9 @@ export default function RootLayout({
     <html lang="fr">
       <body className={`${inter.className} pt-16 flex flex-col min-h-screen`}>
         <ToastProvider>
-          <Header />
+        <Header />
           <main className="flex-1">
-            {children}
+        {children}
           </main>
           <Footer />
         </ToastProvider>

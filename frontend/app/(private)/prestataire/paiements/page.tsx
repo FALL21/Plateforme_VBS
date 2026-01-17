@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import BackButton from '@/components/BackButton';
 
 interface Paiement {
   id: string;
@@ -71,18 +72,26 @@ export default function HistoriquePaiementsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8">
-        <div className="max-w-6xl mx-auto">Chargement...</div>
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="text-gray-500 text-sm sm:text-base">Chargement...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Historique des paiements</h1>
-          <Button onClick={() => router.push('/abonnements/plans')}>
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/prestataire/dashboard" label="Retour au dashboard" />
+        </div>
+        
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Historique des paiements</h1>
+          <Button 
+            onClick={() => router.push('/abonnements/plans')}
+            className="w-full sm:w-auto text-xs sm:text-sm"
+          >
             Nouveau paiement
           </Button>
         </div>
@@ -91,13 +100,13 @@ export default function HistoriquePaiementsPage() {
           <div className="space-y-4">
             {paiements.map((paiement) => (
               <Card key={paiement.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base sm:text-lg text-gray-900 break-words">
                         {paiement.abonnement?.plan?.nom || 'Abonnement'} - {paiement.abonnement?.type}
                       </CardTitle>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
                         {new Date(paiement.createdAt).toLocaleDateString('fr-FR', {
                           year: 'numeric',
                           month: 'long',
@@ -107,14 +116,16 @@ export default function HistoriquePaiementsPage() {
                         })}
                       </p>
                     </div>
-                    {getStatusBadge(paiement.statut)}
+                    <div className="flex-shrink-0">
+                      {getStatusBadge(paiement.statut)}
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm text-gray-600">Méthode: {paiement.methode}</p>
-                      <p className="text-2xl font-bold mt-2">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm text-gray-600">Méthode: {paiement.methode}</p>
+                      <p className="text-xl sm:text-2xl font-bold mt-2 text-gray-900">
                         {formatPrice(paiement.montant)}
                       </p>
                       {paiement.dateValidation && (
@@ -124,7 +135,7 @@ export default function HistoriquePaiementsPage() {
                       )}
                     </div>
                     {paiement.statut === 'EN_ATTENTE' && paiement.methode === 'ESPECES' && (
-                      <div className="text-sm text-gray-600">
+                      <div className="text-xs sm:text-sm text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
                         En attente de validation par un administrateur
                       </div>
                     )}
@@ -135,10 +146,10 @@ export default function HistoriquePaiementsPage() {
           </div>
         ) : (
           <Card>
-            <CardContent className="py-8 text-center text-gray-500">
-              <p>Aucun paiement pour le moment</p>
+            <CardContent className="py-8 sm:py-12 text-center text-gray-500 p-4 sm:p-6">
+              <p className="text-sm sm:text-base mb-4">Aucun paiement pour le moment</p>
               <Button
-                className="mt-4"
+                className="w-full sm:w-auto"
                 onClick={() => router.push('/abonnements/plans')}
               >
                 Souscrire un abonnement

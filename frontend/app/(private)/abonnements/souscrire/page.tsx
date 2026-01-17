@@ -7,12 +7,15 @@ import { useAuthStore } from '@/stores/auth-store';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ToastContainer';
+import { toastSuccess, toastError, toastWarning } from '@/lib/toast';
+import BackButton from '@/components/BackButton';
 
 function Content() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
+  const toast = useToast();
   const planId = searchParams.get('planId');
 
   const [loading, setLoading] = useState(false);
@@ -21,7 +24,6 @@ function Content() {
   const [plans, setPlans] = useState<any[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'WAVE' | 'ESPECES' | null>(null);
-  const [justificatifUrl, setJustificatifUrl] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -50,12 +52,18 @@ function Content() {
 
   const handleCreateAbonnement = async () => {
     if (!selectedPlanId) {
-      alert('Veuillez sélectionner un plan');
+      toastError('Plan requis', 'Veuillez sélectionner un plan d\'abonnement');
+      return;
+    }
+
+    if (!paymentMethod) {
+      toastWarning('Méthode de paiement requise', 'Veuillez sélectionner une méthode de paiement (Wave ou Espèces)');
       return;
     }
 
     setLoading(true);
     try {
+      // Créer l'abonnement
       const response = await api.post('/abonnements', {
         planId: selectedPlanId,
         type: selectedPlan.type,
@@ -65,28 +73,61 @@ function Content() {
 
       // Gérer le paiement selon la méthode choisie
       if (paymentMethod === 'WAVE') {
-        const paymentRes = await api.post('/paiements/wave/initier', {
-          abonnementId,
-          montant: selectedPlan.prix,
-        });
-        if (paymentRes?.data) {
-          alert('Veuillez valider votre paiement Wave via le numéro 776806767. Un administrateur confirmera votre abonnement sous peu.');
-        } else {
-          alert('Votre demande de paiement Wave a été enregistrée. Veuillez valider le transfert au numéro 776806767. Un administrateur confirmera votre abonnement sous peu.');
+        try {
+          const paymentRes = await api.post('/paiements/wave/initier', {
+            abonnementId,
+            montant: selectedPlan.prix,
+          });
+          
+          if (paymentRes?.data?.paiement) {
+            toastSuccess(
+              'Paiement Wave enregistré',
+              `Votre demande de paiement Wave a été enregistrée. Veuillez valider le transfert au numéro 776806767. Un administrateur confirmera votre abonnement sous peu.`,
+            );
+            // Attendre un peu pour que l'utilisateur voie le message
+            setTimeout(() => {
+              router.push('/prestataire/dashboard');
+            }, 2000);
+          } else {
+            throw new Error('Erreur lors de la création du paiement Wave');
+          }
+        } catch (paymentError: any) {
+          console.error('Erreur paiement Wave:', paymentError);
+          toastError(
+            'Erreur de paiement',
+            paymentError.response?.data?.message || 'Erreur lors de la création du paiement Wave. L\'abonnement a été créé mais le paiement n\'a pas pu être associé.',
+          );
+          setTimeout(() => {
+            router.push('/prestataire/dashboard');
+          }, 2000);
         }
-        router.push('/prestataire');
       } else if (paymentMethod === 'ESPECES') {
-        await api.post('/paiements/especes', {
-          abonnementId,
-          montant: selectedPlan.prix,
-          justificatifUrl,
-        });
-        alert('Un agent de VBS va bientôt récupérer votre paiement. Un administrateur confirmera votre abonnement une fois le montant reçu.');
-        router.push('/prestataire');
+        try {
+          await api.post('/paiements/especes', {
+            abonnementId,
+            montant: selectedPlan.prix,
+          });
+          toastSuccess(
+            'Paiement en espèces enregistré',
+            'Un agent de VBS va bientôt récupérer votre paiement. Un administrateur confirmera votre abonnement une fois le montant reçu.',
+          );
+          setTimeout(() => {
+            router.push('/prestataire/dashboard');
+          }, 2000);
+        } catch (paymentError: any) {
+          console.error('Erreur paiement Espèces:', paymentError);
+          toastError(
+            'Erreur de paiement',
+            paymentError.response?.data?.message || 'Erreur lors de la création du paiement en espèces. L\'abonnement a été créé mais le paiement n\'a pas pu être associé.',
+          );
+          setTimeout(() => {
+            router.push('/prestataire/dashboard');
+          }, 2000);
+        }
       }
     } catch (error: any) {
-      console.error('Erreur:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la souscription');
+      console.error('Erreur création abonnement:', error);
+      toastError('Erreur de souscription', error.response?.data?.message || 'Erreur lors de la souscription. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }
@@ -94,9 +135,14 @@ function Content() {
 
   if (step === 'select-plan') {
     return (
-      <div className="min-h-screen p-8 bg-gray-50">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Souscrire un abonnement</h1>
+      <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gray-50">
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+          {/* Bouton retour */}
+          <div>
+            <BackButton href="/prestataire/dashboard" label="Retour au dashboard" />
+          </div>
+          
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Souscrire un abonnement</h1>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {plans.map((plan) => (
               <Card
@@ -137,12 +183,17 @@ function Content() {
   }
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gray-50">
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/prestataire/dashboard" label="Retour au dashboard" />
+        </div>
+        
         <Card>
-          <CardHeader>
-            <CardTitle>Paiement de l'abonnement</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl text-gray-900">Paiement de l'abonnement</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Plan {selectedPlan?.nom} - {selectedPlan?.prix.toLocaleString()} FCFA
             </CardDescription>
           </CardHeader>
@@ -175,14 +226,8 @@ function Content() {
 
             {paymentMethod === 'ESPECES' && (
               <div>
-                <label className="block mb-2">URL du justificatif</label>
-                <Input
-                  placeholder="https://..."
-                  value={justificatifUrl}
-                  onChange={(e) => setJustificatifUrl(e.target.value)}
-                />
-                <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-3">
-                  Un agent VBS prendra contact pour récupérer le paiement en espèces. L’abonnement sera activé après validation administrative.
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-3">
+                  Un agent VBS prendra contact pour récupérer le paiement en espèces. L'abonnement sera activé après validation administrative.
                 </p>
               </div>
             )}

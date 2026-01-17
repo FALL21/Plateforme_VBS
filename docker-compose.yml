@@ -39,6 +39,8 @@ services:
     user: "0:0"
     ports:
       - "4000:4000"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://vbs_user:vbs_password@postgres:5432/vbs_db
       REDIS_URL: redis://redis:6379

@@ -195,7 +195,38 @@ export default function RecherchePage() {
       }
 
       const response = await api.get('/prestataires', { params });
-      setPrestataires(response.data.data || []);
+      let data = response.data.data || [];
+
+      // Calcul de la distance et tri par distance (du plus proche au plus loin)
+      if (userLocation && data.length > 0) {
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const computeDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+          const R = 6371; // Rayon de la Terre en km
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c;
+        };
+
+        const processed = data.map((p: any) => {
+          const plat = p?.user?.latitude ?? (p?.localisation ? p.localisation.coordinates[1] : undefined);
+          const plng = p?.user?.longitude ?? (p?.localisation ? p.localisation.coordinates[0] : undefined);
+          let distanceKm = Number.POSITIVE_INFINITY;
+          if (plat != null && plng != null && userLocation) {
+            distanceKm = computeDistanceKm(userLocation[0], userLocation[1], plat, plng);
+          }
+          return { ...p, _distanceKm: distanceKm };
+        })
+        .sort((a: any, b: any) => (a._distanceKm ?? Infinity) - (b._distanceKm ?? Infinity));
+
+        data = processed;
+      }
+
+      setPrestataires(data);
     } catch (error) {
       console.error('Erreur recherche:', error);
     } finally {
@@ -241,17 +272,17 @@ export default function RecherchePage() {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-7xl mx-auto">
-        <div role="heading" aria-level={1} className="text-3xl font-bold mb-6">Trouver le prestataire idéal près de chez vous</div>
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div role="heading" aria-level={1} className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Trouver le prestataire idéal près de chez vous</div>
 
         {/* Filtres */}
-        <Card className="mb-6 bg-white/90">
-          <CardHeader>
-            <CardTitle>Filtres de recherche</CardTitle>
+        <Card className="bg-white/90">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg text-gray-900">Filtres de recherche</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Input
                 placeholder="Rechercher par nom..."
                 value={searchQuery}
@@ -298,9 +329,9 @@ export default function RecherchePage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Liste des résultats */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
             {prestataires.length > 0 ? (
               prestataires.map((prestataire: any) => (
                 <Card 
@@ -313,43 +344,45 @@ export default function RecherchePage() {
                     router.push(`/prestataires/${prestataire.id}`);
                   }}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle>{prestataire.raisonSociale}</CardTitle>
-                        <CardDescription>{prestataire.description}</CardDescription>
+                  <CardHeader className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base sm:text-lg text-gray-900 break-words">{prestataire.raisonSociale}</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-gray-600 break-words line-clamp-2 sm:line-clamp-none">{prestataire.description}</CardDescription>
                         {prestataire.user?.address && (
-                          <div className="text-sm text-gray-600 mt-1">{prestataire.user.address}</div>
+                          <div className="text-xs sm:text-sm text-gray-600 mt-1 break-words">{prestataire.user.address}</div>
                         )}
                       </div>
-                      <img
-                        src={
-                          normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
-                        }
-                        alt={prestataire.raisonSociale}
-                        className="w-16 h-16 rounded-full object-cover border"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
-                        }}
-                      />
+                      <div className="flex-shrink-0 self-start sm:self-auto">
+                        <img
+                          src={
+                            normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
+                          }
+                          alt={prestataire.raisonSociale}
+                          className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border flex-shrink-0"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
+                          }}
+                        />
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4 flex-wrap">
+                  <CardContent className="p-4 sm:p-6 pt-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-wrap">
                       <RatingStars rating={prestataire.noteMoyenne || 0} showValue size="sm" />
-                      <span className="text-sm text-gray-600">
+                      <span className="text-xs sm:text-sm text-gray-600">
                         {prestataire.nombreAvis || 0} avis
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs ${
+                      <span className={`px-2 sm:px-3 py-1 rounded text-xs font-medium whitespace-nowrap ${
                         prestataire.disponibilite
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
                         {prestataire.disponibilite ? 'Disponible' : 'Indisponible'}
                       </span>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <ContactPrestataireButton prestataire={prestataire} />
+                      <div onClick={(e) => e.stopPropagation()} className="w-full sm:w-auto">
+                        <ContactPrestataireButton prestataire={prestataire} size="sm" />
                       </div>
                     </div>
                   </CardContent>
@@ -357,21 +390,23 @@ export default function RecherchePage() {
               ))
             ) : (
               <Card>
-                <CardContent className="py-8 text-center text-gray-500">
-                  {loading ? 'Recherche en cours...' : 'Aucun prestataire trouvé. Essayez de modifier vos critères.'}
+                <CardContent className="py-6 sm:py-8 text-center text-gray-500 p-4 sm:p-6">
+                  <p className="text-xs sm:text-sm">
+                    {loading ? 'Recherche en cours...' : 'Aucun prestataire trouvé. Essayez de modifier vos critères.'}
+                  </p>
                 </CardContent>
               </Card>
             )}
           </div>
 
           {/* Carte */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-1 lg:order-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Carte</CardTitle>
-                <CardDescription>Localisation des prestataires</CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg text-gray-900">Carte</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Localisation des prestataires</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 {!mapLoading && userLocation && (
                   <MapView
                     center={userLocation}
@@ -384,7 +419,7 @@ export default function RecherchePage() {
                   />
                 )}
                 {mapLoading && (
-                  <div className="h-[400px] flex items-center justify-center text-gray-500">
+                  <div className="h-[300px] sm:h-[400px] flex items-center justify-center text-gray-500 text-xs sm:text-sm">
                     Chargement de la carte...
                   </div>
                 )}

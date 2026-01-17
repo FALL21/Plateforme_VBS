@@ -1,14 +1,16 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { isReady } = useProtectedRoute({ roles: 'ADMIN' });
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (!isReady) {
     return (
@@ -104,7 +106,79 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8">
+        {/* Bouton menu burger (mobile/tablette) */}
+        <div className="lg:hidden mb-4 sm:mb-6">
+          <Button
+            variant="outline"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="w-full sm:w-auto border-2 border-gray-200 hover:border-primary/30 transition-colors"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            Navigation admin
+          </Button>
+        </div>
+
+        {/* Overlay mobile (fond sombre quand menu ouvert) */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Menu burger mobile (drawer) */}
+        <aside
+          className={`fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="h-full flex flex-col p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4 sm:mb-6 pb-3 sm:pb-4 border-b-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">Navigation admin</h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Accès rapide aux principales sections</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Button>
+            </div>
+            <nav className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2">
+              {quickActions.map((item) => {
+                const active = pathname?.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base transition-colors ${
+                      active
+                        ? 'bg-primary/10 text-primary font-semibold border-2 border-primary/20'
+                        : 'text-gray-700 hover:text-primary hover:bg-primary/5 border-2 border-transparent'
+                    }`}
+                  >
+                    <span className={`flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg ${
+                      active ? 'bg-primary/20 text-primary' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {item.icon}
+                    </span>
+                    <span>{item.title}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
         <div className="lg:grid lg:grid-cols-[260px,1fr] lg:gap-6">
           {/* Sidebar admin (desktop) */}
           <aside className="hidden lg:block">

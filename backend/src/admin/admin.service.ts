@@ -18,6 +18,7 @@ export class AdminService {
       demandesActives,
       commandesEnCours,
       abonnementsActifs,
+      abonnementsEnAttente,
       commandesTerminees,
       paiementsValides,
     ] = await Promise.all([
@@ -64,6 +65,12 @@ export class AdminService {
           dateFin: { gte: now }
         } 
       }),
+      // Abonnements en attente d'activation
+      this.prisma.abonnement.count({ 
+        where: { 
+          statut: 'EN_ATTENTE'
+        } 
+      }),
       // Commandes terminées pour calculer le CA
       this.prisma.commande.findMany({ 
         where: { statut: 'TERMINEE' }, 
@@ -86,6 +93,7 @@ export class AdminService {
       totalPrestataires: prestatairesAvecAbonnementActif, // Prestataires vraiment actifs sur la plateforme
       prestatairesPendingKyc,
       paiementsPendingValidation,
+      abonnementsEnAttente,
       demandesActives,
       commandesEnCours,
       abonnementsActifs,
@@ -100,10 +108,211 @@ export class AdminService {
     };
   }
 
-  async getChartData() {
+  async getStatsByPeriod(period: 'daily' | 'weekly' | 'monthly') {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    let startDate: Date;
+
+    switch (period) {
+      case 'daily':
+        // Aujourd'hui (depuis minuit)
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'weekly':
+        // Cette semaine (depuis lundi)
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Ajuster pour lundi
+        startDate = new Date(now);
+        startDate.setDate(diff);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'monthly':
+        // Ce mois (depuis le 1er du mois)
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const [
+      nouveauxUtilisateurs,
+      nouveauxPrestataires,
+      nouvellesDemandes,
+      nouvellesCommandes,
+      commandesTerminees,
+      nouveauxAbonnements,
+      paiementsValides,
+      paiementsEnAttente,
+    ] = await Promise.all([
+      // Nouveaux utilisateurs dans la période
+      this.prisma.user.count({
+        where: {
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Nouveaux prestataires dans la période
+      this.prisma.prestataire.count({
+        where: {
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Nouvelles demandes dans la période
+      this.prisma.demande.count({
+        where: {
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Nouvelles commandes dans la période
+      this.prisma.commande.count({
+        where: {
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Commandes terminées dans la période
+      this.prisma.commande.findMany({
+        where: {
+          statut: 'TERMINEE',
+          updatedAt: { gte: startDate },
+        },
+        select: { prix: true },
+      }),
+      // Nouveaux abonnements dans la période
+      this.prisma.abonnement.count({
+        where: {
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Paiements validés dans la période
+      this.prisma.paiement.findMany({
+        where: {
+          statut: 'VALIDE',
+          dateValidation: { gte: startDate },
+        },
+        select: { montant: true },
+      }),
+      // Paiements en attente créés dans la période
+      this.prisma.paiement.count({
+        where: {
+          statut: 'EN_ATTENTE',
+          createdAt: { gte: startDate },
+        },
+      }),
+    ]);
+
+    const caCommandes = commandesTerminees.reduce((sum, cmd) => sum + (cmd.prix || 0), 0);
+    const caAbonnements = paiementsValides.reduce((sum, p) => sum + (p.montant || 0), 0);
+    const chiffreAffaire = caCommandes + caAbonnements;
+
+    return {
+      period,
+      startDate,
+      endDate: now,
+      nouveauxUtilisateurs,
+      nouveauxPrestataires,
+      nouvellesDemandes,
+      nouvellesCommandes,
+      commandesTerminees: commandesTerminees.length,
+      nouveauxAbonnements,
+      paiementsValides: paiementsValides.length,
+      paiementsEnAttente,
+      chiffreAffaire,
+      // Stats cumulées (toujours depuis le début)
+      totalUtilisateurs: await this.prisma.user.count({ where: { actif: true } }),
+      totalPrestataires: await this.prisma.prestataire.count({
+        where: {
+          user: { actif: true },
+          abonnementActif: true,
+          disponibilite: true,
+        },
+      }),
+      totalAbonnementsActifs: await this.prisma.abonnement.count({
+        where: {
+          statut: 'ACTIF',
+          dateFin: { gte: now },
+        },
+      }),
+      totalCommandesEnCours: await this.prisma.commande.count({
+        where: {
+          statut: { in: ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'] },
+        },
+      }),
+      totalDemandesActives: await this.prisma.demande.count({
+        where: { statut: 'EN_ATTENTE' },
+      }),
+      // Pour compatibilité avec le frontend
+      abonnementsActifs: await this.prisma.abonnement.count({
+        where: {
+          statut: 'ACTIF',
+          dateFin: { gte: now },
+        },
+      }),
+      commandesEnCours: await this.prisma.commande.count({
+        where: {
+          statut: { in: ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'] },
+        },
+      }),
+      demandesActives: await this.prisma.demande.count({
+        where: { statut: 'EN_ATTENTE' },
+      }),
+      prestatairesPendingKyc: await this.prisma.prestataire.count({
+        where: {
+          kycStatut: 'EN_ATTENTE',
+          user: { actif: true },
+        },
+      }),
+      paiementsPendingValidation: await this.prisma.paiement.count({
+        where: {
+          statut: 'EN_ATTENTE',
+          methode: { in: ['ESPECES', 'WAVE'] },
+        },
+      }),
+      abonnementsEnAttente: await this.prisma.abonnement.count({
+        where: {
+          statut: 'EN_ATTENTE',
+        },
+      }),
+      chiffreAffaireTotal: await this.getGlobalStats().then(s => s.chiffreAffaireTotal),
+    };
+  }
+
+  async getChartData(period?: 'daily' | 'weekly' | 'monthly') {
+    const now = new Date();
+    
+    // Déterminer la période de données selon le filtre
+    let startDate: Date;
+    let daysToShow = 30;
+    let description = '30 derniers jours';
+    
+    if (period) {
+      switch (period) {
+        case 'daily':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          daysToShow = 1;
+          description = 'Aujourd\'hui';
+          break;
+        case 'weekly':
+          const dayOfWeek = now.getDay();
+          const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+          startDate = new Date(now);
+          startDate.setDate(diff);
+          startDate.setHours(0, 0, 0, 0);
+          daysToShow = 7;
+          description = 'Cette semaine';
+          break;
+        case 'monthly':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          daysToShow = now.getDate(); // Jours écoulés dans le mois
+          description = 'Ce mois';
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 30);
+      }
+    } else {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 30);
+    }
+    
+    const thirtyDaysAgo = startDate;
 
     // Données pour graphique d'évolution des inscriptions (30 derniers jours)
     const usersByDate = await this.prisma.user.findMany({
@@ -118,9 +327,14 @@ export class AdminService {
 
     // Grouper par date
     const dailyUsers: Record<string, { date: string; users: number; prestataires: number; clients: number }> = {};
-    for (let i = 29; i >= 0; i--) {
+    const startLoop = period === 'daily' ? 0 : (period === 'weekly' ? 6 : (period === 'monthly' ? daysToShow - 1 : 29));
+    for (let i = startLoop; i >= 0; i--) {
       const date = new Date(now);
-      date.setDate(date.getDate() - i);
+      if (period === 'monthly') {
+        date.setDate(i + 1); // Jours du mois
+      } else {
+        date.setDate(date.getDate() - i);
+      }
       const dateStr = date.toISOString().split('T')[0];
       dailyUsers[dateStr] = {
         date: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
@@ -161,14 +375,78 @@ export class AdminService {
       _count: { statut: true },
     });
 
-    // CA par mois (6 derniers mois)
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    // CA par période (adapté selon le filtre)
+    let revenuePeriodStart: Date;
+    let revenueData: Record<string, { month: string; abonnements: number; commandes: number; total: number }> = {};
+    
+    if (period === 'daily') {
+      // Pour le quotidien, on groupe par heures de la journée
+      revenuePeriodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      for (let h = 0; h < 24; h++) {
+        const hourKey = `${h}h`;
+        revenueData[hourKey] = {
+          month: `${h}h`,
+          abonnements: 0,
+          commandes: 0,
+          total: 0,
+        };
+      }
+    } else if (period === 'weekly') {
+      // Pour la semaine, on groupe par jour
+      const dayOfWeek = now.getDay();
+      const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      revenuePeriodStart = new Date(now);
+      revenuePeriodStart.setDate(diff);
+      revenuePeriodStart.setHours(0, 0, 0, 0);
+      
+      const daysOfWeek = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(revenuePeriodStart);
+        date.setDate(date.getDate() + d);
+        const dateKey = date.toISOString().split('T')[0];
+        revenueData[dateKey] = {
+          month: daysOfWeek[d],
+          abonnements: 0,
+          commandes: 0,
+          total: 0,
+        };
+      }
+    } else if (period === 'monthly') {
+      // Pour le mois, on groupe par semaine
+      revenuePeriodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const weeksInMonth = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 0).getDay()) / 7);
+      for (let w = 0; w < weeksInMonth; w++) {
+        const weekKey = `Semaine ${w + 1}`;
+        revenueData[weekKey] = {
+          month: weekKey,
+          abonnements: 0,
+          commandes: 0,
+          total: 0,
+        };
+      }
+    } else {
+      // Par défaut : 6 derniers mois
+      revenuePeriodStart = new Date(now);
+      revenuePeriodStart.setMonth(revenuePeriodStart.getMonth() - 6);
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now);
+        date.setMonth(date.getMonth() - i);
+        const monthNum = date.getMonth() + 1;
+        const monthKey = `${date.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+        const monthLabel = date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+        revenueData[monthKey] = {
+          month: monthLabel,
+          abonnements: 0,
+          commandes: 0,
+          total: 0,
+        };
+      }
+    }
     
     const paiementsByMonth = await this.prisma.paiement.findMany({
       where: {
         statut: 'VALIDE',
-        createdAt: { gte: sixMonthsAgo },
+        createdAt: { gte: revenuePeriodStart },
       },
       select: {
         createdAt: true,
@@ -179,7 +457,7 @@ export class AdminService {
     const commandesByMonth = await this.prisma.commande.findMany({
       where: {
         statut: 'TERMINEE',
-        createdAt: { gte: sixMonthsAgo },
+        createdAt: { gte: revenuePeriodStart },
       },
       select: {
         createdAt: true,
@@ -187,36 +465,71 @@ export class AdminService {
       },
     });
 
-    const monthlyRevenue: Record<string, { month: string; abonnements: number; commandes: number; total: number }> = {};
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now);
-      date.setMonth(date.getMonth() - i);
-      const monthNum = date.getMonth() + 1;
-      const monthKey = `${date.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
-      const monthLabel = date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-      monthlyRevenue[monthKey] = {
-        month: monthLabel,
-        abonnements: 0,
-        commandes: 0,
-        total: 0,
-      };
+    const monthlyRevenue = revenueData;
+
+    if (period === 'daily') {
+      // Grouper par heure
+      paiementsByMonth.forEach((p) => {
+        const hour = p.createdAt.getHours();
+        const hourKey = `${hour}h`;
+        if (monthlyRevenue[hourKey]) {
+          monthlyRevenue[hourKey].abonnements += p.montant || 0;
+        }
+      });
+      commandesByMonth.forEach((c) => {
+        const hour = c.createdAt.getHours();
+        const hourKey = `${hour}h`;
+        if (monthlyRevenue[hourKey]) {
+          monthlyRevenue[hourKey].commandes += c.prix || 0;
+        }
+      });
+    } else if (period === 'weekly') {
+      // Grouper par jour de la semaine
+      paiementsByMonth.forEach((p) => {
+        const dateKey = p.createdAt.toISOString().split('T')[0];
+        if (monthlyRevenue[dateKey]) {
+          monthlyRevenue[dateKey].abonnements += p.montant || 0;
+        }
+      });
+      commandesByMonth.forEach((c) => {
+        const dateKey = c.createdAt.toISOString().split('T')[0];
+        if (monthlyRevenue[dateKey]) {
+          monthlyRevenue[dateKey].commandes += c.prix || 0;
+        }
+      });
+    } else if (period === 'monthly') {
+      // Grouper par semaine du mois
+      paiementsByMonth.forEach((p) => {
+        const weekNum = Math.floor((p.createdAt.getDate() - 1) / 7);
+        const weekKey = `Semaine ${weekNum + 1}`;
+        if (monthlyRevenue[weekKey]) {
+          monthlyRevenue[weekKey].abonnements += p.montant || 0;
+        }
+      });
+      commandesByMonth.forEach((c) => {
+        const weekNum = Math.floor((c.createdAt.getDate() - 1) / 7);
+        const weekKey = `Semaine ${weekNum + 1}`;
+        if (monthlyRevenue[weekKey]) {
+          monthlyRevenue[weekKey].commandes += c.prix || 0;
+        }
+      });
+    } else {
+      // Par défaut : par mois
+      paiementsByMonth.forEach((p) => {
+        const monthNum = p.createdAt.getMonth() + 1;
+        const monthKey = `${p.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+        if (monthlyRevenue[monthKey]) {
+          monthlyRevenue[monthKey].abonnements += p.montant || 0;
+        }
+      });
+      commandesByMonth.forEach((c) => {
+        const monthNum = c.createdAt.getMonth() + 1;
+        const monthKey = `${c.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
+        if (monthlyRevenue[monthKey]) {
+          monthlyRevenue[monthKey].commandes += c.prix || 0;
+        }
+      });
     }
-
-    paiementsByMonth.forEach((p) => {
-      const monthNum = p.createdAt.getMonth() + 1;
-      const monthKey = `${p.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
-      if (monthlyRevenue[monthKey]) {
-        monthlyRevenue[monthKey].abonnements += p.montant || 0;
-      }
-    });
-
-    commandesByMonth.forEach((c) => {
-      const monthNum = c.createdAt.getMonth() + 1;
-      const monthKey = `${c.createdAt.getFullYear()}-${monthNum < 10 ? '0' : ''}${monthNum}`;
-      if (monthlyRevenue[monthKey]) {
-        monthlyRevenue[monthKey].commandes += c.prix || 0;
-      }
-    });
 
     Object.keys(monthlyRevenue).forEach((key) => {
       monthlyRevenue[key].total = monthlyRevenue[key].abonnements + monthlyRevenue[key].commandes;
@@ -350,6 +663,43 @@ export class AdminService {
     return prestataire;
   }
 
+  async getAbonnementsEnAttente() {
+    const abonnements = await this.prisma.abonnement.findMany({
+      where: {
+        statut: 'EN_ATTENTE',
+      },
+      include: {
+        prestataire: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        plan: true,
+        paiements: {
+          where: {
+            statut: 'EN_ATTENTE',
+            methode: { in: ['WAVE', 'ESPECES'] },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Filtrer pour ne retourner que les abonnements qui ont au moins un paiement en attente
+    return abonnements.filter(ab => ab.paiements && ab.paiements.length > 0);
+  }
+
   async getPaiementsEnAttente() {
     return this.prisma.paiement.findMany({
       where: {
@@ -419,5 +769,117 @@ export class AdminService {
     });
 
     return paiement;
+  }
+
+  async supprimerAbonnementsSansPaiement() {
+    // Trouver tous les abonnements qui n'ont aucun paiement associé
+    const abonnementsSansPaiement = await this.prisma.abonnement.findMany({
+      where: {
+        paiements: {
+          none: {},
+        },
+      },
+      include: {
+        prestataire: {
+          select: {
+            id: true,
+            raisonSociale: true,
+          },
+        },
+      },
+    });
+
+    // Supprimer ces abonnements
+    const result = await this.prisma.abonnement.deleteMany({
+      where: {
+        paiements: {
+          none: {},
+        },
+      },
+    });
+
+    return {
+      nombreSupprime: result.count,
+      abonnements: abonnementsSansPaiement.map((a) => ({
+        id: a.id,
+        prestataire: a.prestataire?.raisonSociale || 'N/A',
+        type: a.type,
+        statut: a.statut,
+        createdAt: a.createdAt,
+      })),
+    };
+  }
+
+  async supprimerCommandesAnciennes() {
+    // Calculer le début du mois en cours
+    const maintenant = new Date();
+    const debutMois = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
+    debutMois.setHours(0, 0, 0, 0);
+
+    // Trouver toutes les commandes créées avant le début du mois en cours
+    const commandesAnciennes = await this.prisma.commande.findMany({
+      where: {
+        createdAt: {
+          lt: debutMois,
+        },
+      },
+      include: {
+        demande: {
+          include: {
+            utilisateur: {
+              select: {
+                phone: true,
+              },
+            },
+          },
+        },
+        prestataire: {
+          select: {
+            raisonSociale: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Compter les commandes par statut
+    const parStatut = commandesAnciennes.reduce((acc, cmd) => {
+      acc[cmd.statut] = (acc[cmd.statut] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Supprimer ces commandes
+    const result = await this.prisma.commande.deleteMany({
+      where: {
+        createdAt: {
+          lt: debutMois,
+        },
+      },
+    });
+
+    // Compter les commandes restantes
+    const commandesRestantes = await this.prisma.commande.count({
+      where: {
+        createdAt: {
+          gte: debutMois,
+        },
+      },
+    });
+
+    return {
+      nombreSupprime: result.count,
+      dateLimite: debutMois,
+      repartitionParStatut: parStatut,
+      commandesRestantes,
+      commandes: commandesAnciennes.slice(0, 50).map((c) => ({
+        id: c.id,
+        client: c.demande?.utilisateur?.phone || 'N/A',
+        prestataire: c.prestataire?.raisonSociale || 'N/A',
+        statut: c.statut,
+        createdAt: c.createdAt,
+      })),
+    };
   }
 }

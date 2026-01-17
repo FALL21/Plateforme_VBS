@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RatingStars from '@/components/RatingStars';
 import ContactPrestataireButton from '@/components/ContactPrestataireButton';
+import BackButton from '@/components/BackButton';
 
 export default function PrestataireDetailPage() {
   const params = useParams();
@@ -370,14 +371,14 @@ export default function PrestataireDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
-        <div className="max-w-6xl mx-auto text-center">
+      <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-6xl mx-auto text-center w-full">
           <div className="flex items-center justify-center gap-3">
-            <svg className="animate-spin h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-5 w-5 sm:h-6 sm:w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span className="text-lg text-gray-700">Chargement du prestataire...</span>
+            <span className="text-base sm:text-lg text-gray-700">Chargement du prestataire...</span>
           </div>
         </div>
       </div>
@@ -386,24 +387,24 @@ export default function PrestataireDetailPage() {
 
   if (error || !prestataire) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50 flex items-center justify-center">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-6xl mx-auto w-full px-4 sm:px-0">
           <Card className="border-red-200 bg-red-50">
-            <CardHeader>
-              <CardTitle className="text-red-800">Erreur</CardTitle>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg text-red-800">Erreur</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-red-700 mb-4">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <p className="text-sm sm:text-base text-red-700 mb-3 sm:mb-4">
                 {error || 'Prestataire non trouvé'}
               </p>
-              <p className="text-sm text-red-600 mb-4">
+              <p className="text-xs sm:text-sm text-red-600 mb-3 sm:mb-4">
                 {error?.includes('inactif') 
                   ? 'Ce prestataire n\'est pas actif ou son compte a été désactivé.'
                   : 'Le prestataire demandé n\'existe pas ou n\'est plus disponible.'}
               </p>
               <a
                 href="/"
-                className="inline-flex items-center gap-2 text-primary hover:underline"
+                className="inline-flex items-center gap-2 text-primary hover:underline text-sm sm:text-base"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -419,37 +420,44 @@ export default function PrestataireDetailPage() {
 
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div className="mb-2 sm:mb-0">
+          <BackButton href="/" label="Retour à l'accueil" />
+        </div>
+        
         {/* En-tête */}
         <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-3xl mb-2">{prestataire.raisonSociale}</CardTitle>
-                <CardDescription className="text-lg">{prestataire.description}</CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-xl sm:text-2xl lg:text-3xl mb-2 text-gray-900 break-words">{prestataire.raisonSociale}</CardTitle>
+                <CardDescription className="text-sm sm:text-base lg:text-lg text-gray-600 break-words">{prestataire.description}</CardDescription>
               </div>
-                     <img
-                src={
-                  normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
-                }
-                alt={prestataire.raisonSociale}
-                className="w-24 h-24 rounded-full object-cover border"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src =
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
-                }}
-              />
+              <div className="flex-shrink-0 self-start sm:self-auto">
+                <img
+                  src={
+                    normalizeLogoUrl(prestataire.logoUrl, prestataire.updatedAt) ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`
+                  }
+                  alt={prestataire.raisonSociale}
+                  className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full object-cover border flex-shrink-0"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src =
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(prestataire.raisonSociale || 'P')}&background=0D8ABC&color=fff&size=128`;
+                  }}
+                />
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 flex-wrap">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-wrap">
               <RatingStars rating={prestataire.noteMoyenne || 0} showValue size="lg" />
-              <span className="text-gray-600">
+              <span className="text-sm sm:text-base text-gray-600">
                 {prestataire.nombreAvis || 0} avis
               </span>
-              <span className={`px-3 py-1 rounded-full text-sm ${
+              <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap ${
                 prestataire.disponibilite
                   ? 'bg-green-100 text-green-800'
                   : 'bg-red-100 text-red-800'
@@ -460,23 +468,23 @@ export default function PrestataireDetailPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Colonne principale */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Services proposés */}
             {prestataire.prestataireServices && prestataire.prestataireServices.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Services proposés</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg text-gray-900">Services proposés</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
                     {prestataire.prestataireServices.map((ps: any) => (
-                      <div key={ps.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <div>
-                          <p className="font-medium">{ps.service.nom}</p>
+                      <div key={ps.id} className="flex justify-between items-center p-3 sm:p-4 bg-gray-50 rounded">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm sm:text-base text-gray-900 break-words">{ps.service.nom}</p>
                           {ps.description && (
-                            <p className="text-sm text-gray-600">{ps.description}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">{ps.description}</p>
                           )}
                         </div>
                       </div>
@@ -489,14 +497,14 @@ export default function PrestataireDetailPage() {
             {/* Travaux récents (galerie d'images) */}
             {prestataire.travauxRecents && prestataire.travauxRecents.length > 0 ? (
               <Card>
-                <CardHeader>
-                  <CardTitle>Travaux récents</CardTitle>
-                  <CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg text-gray-900">Travaux récents</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Quelques exemples de réalisations récentes du prestataire
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
                     {prestataire.travauxRecents.map((work: any) => {
                       const imageSrc = normalizeImageUrl(work.imageUrl, work.createdAt);
                       return (
@@ -508,7 +516,7 @@ export default function PrestataireDetailPage() {
                           <img
                             src={imageSrc || 'https://via.placeholder.com/300x300?text=Image+non+disponible'}
                             alt={work.titre || 'Travail récent'}
-                            className="w-full h-32 md:h-40 lg:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-24 sm:h-32 md:h-40 lg:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               const target = e.currentTarget;
                               if (target.src.includes('placeholder')) return;
@@ -539,15 +547,15 @@ export default function PrestataireDetailPage() {
               </Card>
             ) : (
               <Card>
-                <CardHeader>
-                  <CardTitle>Travaux récents</CardTitle>
-                  <CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg text-gray-900">Travaux récents</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Quelques exemples de réalisations récentes du prestataire
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="text-sm">Aucun travail récent disponible</p>
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="text-center py-6 sm:py-8 text-gray-500">
+                    <p className="text-xs sm:text-sm">Aucun travail récent disponible</p>
                     <p className="text-xs text-gray-400 mt-1">Le prestataire n'a pas encore ajouté de photos de ses réalisations</p>
                   </div>
                 </CardContent>
@@ -557,19 +565,19 @@ export default function PrestataireDetailPage() {
             {/* Prestations récentes */}
             {prestationsRecent.slice(0, 3).length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Prestations récentes</CardTitle>
-                  <CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg text-gray-900">Prestations récentes</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Dernières réalisations terminées
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="space-y-3 sm:space-y-4">
                     {prestationsRecent.slice(0, 3).map((prestation: any, index: number) => (
-                      <div key={prestation.id} className="border-b pb-4 last:border-b-0">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900 mb-1">
+                      <div key={prestation.id} className="border-b pb-3 sm:pb-4 last:border-b-0">
+                        <div className="flex items-start gap-3 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm sm:text-base text-gray-900 mb-1 break-words">
                               {prestation.demande?.service?.nom || 'Service'}
                             </p>
                             <p className="text-sm text-gray-600 mb-2">
@@ -611,7 +619,7 @@ export default function PrestataireDetailPage() {
                               <img
                                 src={getDemoImageUrl(prestation, 'thumb', index)}
                                 alt={prestation.demande?.service?.nom || 'Prestation'}
-                                className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200 hover:border-primary transition-colors"
+                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover border-2 border-gray-200 hover:border-primary transition-colors"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLImageElement).src = getDemoImageUrl(prestation, 'thumb', index + 1);
                                 }}
@@ -726,21 +734,21 @@ export default function PrestataireDetailPage() {
           </div>
 
           {/* Colonne latérale */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Distance et Durée */}
             <Card>
-              <CardHeader>
-                <CardTitle>Distance et Durée</CardTitle>
-                <CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg text-gray-900">Distance et Durée</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   Informations de trajet
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4">
                 {!userLocation ? (
-                  <div className="text-center py-4 space-y-3">
-                    <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-2">
+                  <div className="text-center py-3 sm:py-4 space-y-2 sm:space-y-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-2">
                       <svg
-                        className="w-6 h-6 text-gray-400"
+                        className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -759,7 +767,7 @@ export default function PrestataireDetailPage() {
                         />
                       </svg>
                     </div>
-                    <p className="text-sm text-gray-700 font-medium mb-1">
+                    <p className="text-xs sm:text-sm text-gray-700 font-medium mb-1">
                       Géolocalisation requise
                     </p>
                     <p className="text-xs text-gray-500">
@@ -770,7 +778,7 @@ export default function PrestataireDetailPage() {
                     </p>
                   </div>
                 ) : calculatingRoute ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500 py-4">
+                  <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-gray-500 py-3 sm:py-4">
                     <svg className="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -778,12 +786,12 @@ export default function PrestataireDetailPage() {
                     <span>Calcul en cours...</span>
                   </div>
                 ) : distance !== null && duration !== null ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {/* Distance */}
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                      <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <svg
-                          className="w-5 h-5 text-blue-600"
+                          className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -796,9 +804,9 @@ export default function PrestataireDetailPage() {
                           />
                         </svg>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs text-gray-500">Distance</p>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-base sm:text-lg font-semibold text-gray-900">
                           {distance < 1 
                             ? `${Math.round(distance * 1000)} m` 
                             : `${distance.toFixed(1)} km`}
@@ -807,10 +815,10 @@ export default function PrestataireDetailPage() {
                     </div>
 
                     {/* Durée */}
-                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                      <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
                         <svg
-                          className="w-5 h-5 text-green-600"
+                          className="w-4 h-4 sm:w-5 sm:h-5 text-green-600"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -823,9 +831,9 @@ export default function PrestataireDetailPage() {
                           />
                         </svg>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs text-gray-500">Durée du trajet</p>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-base sm:text-lg font-semibold text-gray-900">
                           {duration < 60 
                             ? `${duration} min` 
                             : `${Math.floor(duration / 60)}h ${duration % 60}min`}
@@ -834,8 +842,8 @@ export default function PrestataireDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-4 space-y-2">
-                    <p className="text-sm text-gray-700 font-medium">
+                  <div className="text-center py-3 sm:py-4 space-y-2">
+                    <p className="text-xs sm:text-sm text-gray-700 font-medium">
                       Distance et durée non disponibles
                     </p>
                     <p className="text-xs text-gray-500">
@@ -852,15 +860,15 @@ export default function PrestataireDetailPage() {
 
             {/* Informations de contact */}
             <Card>
-              <CardHeader>
-                <CardTitle>Contact</CardTitle>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg text-gray-900">Contact</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
                 {/* Téléphone supprimé de cette section */}
                 {prestataire.user?.address && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-2"><strong>Adresse:</strong></p>
-                    <p className="text-sm">{prestataire.user.address}</p>
+                  <div className="mb-2 sm:mb-3">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2"><strong>Adresse:</strong></p>
+                    <p className="text-xs sm:text-sm text-gray-900 break-words">{prestataire.user.address}</p>
                   </div>
                 )}
                 {/* Bouton WhatsApp direct (affiche si user existe; gère le numéro à l'intérieur) */}
@@ -868,17 +876,17 @@ export default function PrestataireDetailPage() {
                   href={prestataire.user ? getWhatsAppLink(prestataire.user.phone, `Bonjour, je vous contacte via VBS pour votre service.`) : '#'}
                   target="_blank"
                   rel="noreferrer"
-                  className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-opacity font-medium shadow-sm ${prestataire.user?.phone ? 'bg-[#25D366] text-white hover:opacity-90' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-opacity font-medium shadow-sm text-xs sm:text-sm ${prestataire.user?.phone ? 'bg-[#25D366] text-white hover:opacity-90' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
                   aria-disabled={!prestataire.user?.phone}
                 >
                   {/* WhatsApp icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 fill-current" aria-hidden>
                     <path d="M.057 24l1.687-6.163a10.9 10.9 0 01-1.6-5.71C.144 5.281 5.403 0 12.057 0c3.162 0 6.126 1.233 8.367 3.472a11.77 11.77 0 013.47 8.385c-.003 6.654-5.262 11.912-11.917 11.912a11.9 11.9 0 01-5.695-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.593 5.448 0 9.886-4.434 9.889-9.882.002-5.462-4.415-9.89-9.881-9.893-5.452 0-9.887 4.43-9.889 9.882 0 2.225.651 3.891 1.746 5.555l-.999 3.648 3.742-.903zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.463-2.39-1.476-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.149-.173.198-.297.297-.495.099-.198.05-.372-.025-.521-.074-.149-.669-1.611-.916-2.205-.242-.58-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.017-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.227 1.36.195 1.872.118.571-.085 1.758-.718 2.006-1.412.248-.694.248-1.289.173-1.412z"/>
                   </svg>
                   Contacter sur WhatsApp
                 </a>
                 <ContactPrestataireButton prestataire={prestataire} size="full" />
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-gray-500 text-center leading-relaxed">
                   Appelez directement le prestataire. Connectez-vous pour suivre vos commandes et laisser des avis.
                 </p>
               </CardContent>

@@ -158,9 +158,9 @@ export class UsersService {
     if (filters?.search) {
       searchCondition = {
         OR: [
-          { email: { contains: filters.search, mode: 'insensitive' } },
-          { phone: { contains: filters.search } },
-          { address: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
+        { phone: { contains: filters.search } },
+        { address: { contains: filters.search, mode: 'insensitive' } },
         ]
       };
     }

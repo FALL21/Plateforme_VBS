@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import BackButton from '@/components/BackButton';
 
 function AvisForm() {
   const { user, isAuthenticated } = useAuthStore();
@@ -90,12 +91,17 @@ function AvisForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/client/dashboard" label="Retour au dashboard" />
+        </div>
+        
         <Card>
-          <CardHeader>
-            <CardTitle>Donner votre avis</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl text-gray-900">Donner votre avis</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Partagez votre expérience avec {commande?.prestataire?.raisonSociale}
             </CardDescription>
           </CardHeader>

@@ -116,34 +116,38 @@ export default function AdminCommandesPage() {
   const hasActiveFilters = filters.statut !== 'all' || filters.dateDebut || filters.dateFin || filters.secteur !== 'all' || filters.client;
 
   if (loading) {
-    return <div className="text-gray-500 text-sm">Chargement des commandes...</div>;
+    return (
+      <div className="flex items-center justify-center py-8 sm:py-12">
+        <div className="text-gray-500 text-sm sm:text-base">Chargement des commandes...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Commandes clients</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Commandes clients</h1>
+        <p className="text-xs sm:text-sm text-gray-600 mt-1">
           Liste des commandes créées entre clients et prestataires.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtres</CardTitle>
-          <CardDescription>
+      <Card className="border-2">
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">Filtres</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Filtrez les commandes selon vos critères.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Statut</label>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Statut</label>
               <Select
                 value={filters.statut}
                 onValueChange={(value) => setFilters({ ...filters, statut: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -157,30 +161,32 @@ export default function AdminCommandesPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Date début</label>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Date début</label>
               <Input
                 type="date"
                 value={filters.dateDebut}
                 onChange={(e) => setFilters({ ...filters, dateDebut: e.target.value })}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Date fin</label>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Date fin</label>
               <Input
                 type="date"
                 value={filters.dateFin}
                 onChange={(e) => setFilters({ ...filters, dateFin: e.target.value })}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Secteur</label>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Secteur</label>
               <Select
                 value={filters.secteur}
                 onValueChange={(value) => setFilters({ ...filters, secteur: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -195,28 +201,29 @@ export default function AdminCommandesPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Client (téléphone/email)</label>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Client (téléphone/email)</label>
               <Input
                 type="text"
                 placeholder="Rechercher..."
                 value={filters.client}
                 onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
 
           {hasActiveFilters && (
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={resetFilters}
-                className="text-xs"
+                className="text-xs h-9 sm:h-10"
               >
-                <X className="h-3 w-3 mr-1" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5" />
                 Réinitialiser les filtres
               </Button>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs sm:text-sm text-gray-500 text-center sm:text-left py-2 sm:py-0">
                 {commandesFiltrees.length} commande{commandesFiltrees.length > 1 ? 's' : ''} trouvée{commandesFiltrees.length > 1 ? 's' : ''}
               </span>
             </div>
@@ -224,10 +231,10 @@ export default function AdminCommandesPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Commandes récentes</CardTitle>
-          <CardDescription>
+      <Card className="border-2">
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">Commandes récentes</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             {hasActiveFilters
               ? `${commandesFiltrees.length} commande${commandesFiltrees.length > 1 ? 's' : ''} correspondant aux filtres.`
               : 'Les 200 dernières commandes, triées par date de création.'}
@@ -235,40 +242,35 @@ export default function AdminCommandesPage() {
         </CardHeader>
         <CardContent>
           {commandesFiltrees.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-6">
+            <p className="text-xs sm:text-sm text-gray-500 text-center py-8 sm:py-12">
               {hasActiveFilters
                 ? 'Aucune commande ne correspond aux filtres sélectionnés.'
                 : 'Aucune commande pour le moment.'}
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {commandesFiltrees.map((c) => (
                 <div
                   key={c.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-3 sm:p-4 border-2 rounded-lg hover:bg-gray-50 hover:border-primary/20 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                      <span>{c.demande?.service?.nom || 'Service'}</span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm font-medium text-gray-900">
+                      <span className="break-words">{c.demande?.service?.nom || 'Service'}</span>
                       {c.statut && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
                           {c.statut}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1.5 break-words">
                       Prestataire: {c.prestataire?.raisonSociale || 'Non renseigné'}
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1 break-words">
                       Client: {c.utilisateur?.phone || c.utilisateur?.email || 'Inconnu'}
                     </p>
-                    {typeof c.prix === 'number' && (
-                      <p className="text-[11px] text-gray-500 mt-1">
-                        Montant: {c.prix.toLocaleString('fr-FR')} FCFA
-                      </p>
-                    )}
                   </div>
-                  <div className="text-xs text-gray-500 whitespace-nowrap">
+                  <div className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap text-left sm:text-right">
                     {new Date(c.createdAt).toLocaleString('fr-FR')}
                   </div>
                 </div>

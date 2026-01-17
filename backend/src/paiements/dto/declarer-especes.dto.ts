@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsNumber, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, Min, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class DeclarerEspecesDto {
@@ -13,9 +13,9 @@ export class DeclarerEspecesDto {
   @Min(0)
   montant: number;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  justificatifUrl: string;
+  justificatifUrl?: string;
 }
 

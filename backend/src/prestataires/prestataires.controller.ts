@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PrestatairesService } from './prestataires.service';
 import { CreatePrestataireDto } from './dto/create-prestataire.dto';
 import { UpdatePrestataireDto } from './dto/update-prestataire.dto';
@@ -121,6 +121,26 @@ export class PrestatairesController {
   @ApiOperation({ summary: 'Mettre à jour les services proposés' })
   async updateServices(@Request() req, @Body() body: { serviceIds: string[] }) {
     return this.prestatairesService.updateServices(req.user.id, body.serviceIds);
+  }
+
+  @Get('reports/stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer les statistiques de services prestés par période' })
+  @ApiQuery({ name: 'period', enum: ['daily', 'weekly', 'monthly'], required: true })
+  async getStats(@Request() req, @Query('period') period: 'daily' | 'weekly' | 'monthly') {
+    return this.prestatairesService.getStatsByPeriod(req.user.id, period);
+  }
+
+  @Get('reports/charts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PRESTATAIRE')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer les données de graphiques pour les services prestés' })
+  @ApiQuery({ name: 'period', enum: ['daily', 'weekly', 'monthly'], required: false })
+  async getChartData(@Request() req, @Query('period') period?: 'daily' | 'weekly' | 'monthly') {
+    return this.prestatairesService.getChartData(req.user.id, period);
   }
 }
 

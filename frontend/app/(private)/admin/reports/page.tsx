@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   LineChart,
   Line,
@@ -25,6 +26,7 @@ import {
 export default function ReportsPage() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('all');
   const [stats, setStats] = useState<any>(null);
   const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -36,13 +38,14 @@ export default function ReportsPage() {
     }
 
     fetchStats();
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, period]);
 
   const fetchStats = async () => {
     try {
+      const params = period !== 'all' ? { params: { period } } : {};
       const [statsRes, chartsRes] = await Promise.all([
-        api.get('/admin/stats'),
-        api.get('/admin/charts'),
+        api.get('/admin/stats', params),
+        api.get('/admin/charts', params),
       ]);
       setStats(statsRes.data);
       setChartData(chartsRes.data);
@@ -69,9 +72,22 @@ export default function ReportsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Rapports & Analytics</h1>
             <p className="text-gray-600 mt-2">KPIs et statistiques détaillées</p>
           </div>
-          <Button onClick={() => router.push('/admin/dashboard')} variant="outline">
-            ← Retour au dashboard
-          </Button>
+          <div className="flex items-center gap-3">
+            <Select value={period} onValueChange={(value: 'daily' | 'weekly' | 'monthly' | 'all') => setPeriod(value)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Période" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les données</SelectItem>
+                <SelectItem value="daily">Quotidien</SelectItem>
+                <SelectItem value="weekly">Hebdomadaire</SelectItem>
+                <SelectItem value="monthly">Mensuel</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={() => router.push('/admin/dashboard')} variant="outline">
+              ← Retour au dashboard
+            </Button>
+          </div>
         </div>
 
         {/* KPIs Principaux */}
@@ -80,43 +96,73 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">Utilisateurs</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Nouveaux utilisateurs' : 'Utilisateurs'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{stats?.totalUtilisateurs || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">Total inscrits</div>
+                <div className="text-3xl font-bold text-primary">
+                  {period !== 'all' ? (stats?.nouveauxUtilisateurs || 0) : (stats?.totalUtilisateurs || 0)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `Nouveaux cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'Total inscrits'}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">Prestataires</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Nouveaux prestataires' : 'Prestataires'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-600">{stats?.totalPrestataires || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">Actifs</div>
+                <div className="text-3xl font-bold text-blue-600">
+                  {period !== 'all' ? (stats?.nouveauxPrestataires || 0) : (stats?.totalPrestataires || 0)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `Nouveaux cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'Actifs'}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">Abonnements</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Nouveaux abonnements' : 'Abonnements'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600">{stats?.abonnementsActifs || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">Actifs</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {period !== 'all' ? (stats?.nouveauxAbonnements || 0) : (stats?.abonnementsActifs || 0)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `Nouveaux cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'Actifs'}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">CA Total</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Chiffre d\'affaires' : 'CA Total'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
-                  {(stats?.chiffreAffaireTotal || 0).toLocaleString('fr-FR')} FCFA
+                  {(period !== 'all' ? (stats?.chiffreAffaire || 0) : (stats?.chiffreAffaireTotal || 0)).toLocaleString('fr-FR')} FCFA
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Revenus</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `CA cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'Revenus'}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -128,21 +174,37 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">Demandes actives</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Nouvelles demandes' : 'Demandes actives'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-indigo-600">{stats?.demandesActives || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">En cours de traitement</div>
+                <div className="text-3xl font-bold text-indigo-600">
+                  {period !== 'all' ? (stats?.nouvellesDemandes || 0) : (stats?.demandesActives || 0)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `Nouvelles cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'En cours de traitement'}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-gray-600">Commandes en cours</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {period !== 'all' ? 'Nouvelles commandes' : 'Commandes en cours'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-teal-600">{stats?.commandesEnCours || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">Services en exécution</div>
+                <div className="text-3xl font-bold text-teal-600">
+                  {period !== 'all' ? (stats?.nouvellesCommandes || 0) : (stats?.commandesEnCours || 0)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {period !== 'all' 
+                    ? `Nouvelles cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}`
+                    : 'Services en exécution'}
+                </div>
               </CardContent>
             </Card>
 
@@ -243,7 +305,12 @@ export default function ReportsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Évolution du chiffre d'affaires</CardTitle>
-                  <CardDescription>6 derniers mois</CardDescription>
+                  <CardDescription>
+                    {period === 'daily' ? 'Aujourd\'hui (par heure)' : 
+                     period === 'weekly' ? 'Cette semaine (par jour)' :
+                     period === 'monthly' ? 'Ce mois (par semaine)' :
+                     '6 derniers mois'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>

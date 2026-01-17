@@ -13,7 +13,7 @@ const api = axios.create({
   },
 });
 
-// Intercepteur pour ajouter le token
+// Intercepteur pour ajouter le token (silencieux si non connecté)
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     try {
@@ -22,12 +22,7 @@ api.interceptors.request.use((config) => {
         const { state } = JSON.parse(authStorage);
         if (state?.accessToken) {
           config.headers.Authorization = `Bearer ${state.accessToken}`;
-          console.log('🔑 Token ajouté à la requête:', config.method?.toUpperCase(), config.url);
-        } else {
-          console.warn('⚠️ Pas de token dans auth-storage');
         }
-      } else {
-        console.warn('⚠️ auth-storage vide');
       }
     } catch (error) {
       console.error('❌ Erreur lecture token:', error);
@@ -41,6 +36,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      const requestUrl = error.config?.url || '';
+      const isAuthOtp = requestUrl.includes('/auth/otp/');
+      if (isAuthOtp) {
+        return Promise.reject(error);
+      }
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import BackButton from "@/components/BackButton";
 
 export default function DemandesPage() {
   const router = useRouter();
@@ -27,43 +28,58 @@ export default function DemandesPage() {
     fetchData();
   }, [isAuthenticated, router]);
 
-  if (loading) return <div className="p-8">Chargement...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="text-gray-500 text-sm sm:text-base">Chargement...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Mes demandes</h1>
-          <a href="/demandes/new" className="text-primary hover:underline">Créer une demande</a>
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/client/dashboard" label="Retour au dashboard" />
         </div>
-        <div className="space-y-3">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Mes demandes</h1>
+          <a href="/demandes/new" className="text-primary hover:underline text-sm sm:text-base font-medium text-center sm:text-left">
+            Créer une demande
+          </a>
+        </div>
+        <div className="space-y-3 sm:space-y-4">
           {demandes.length === 0 ? (
             <Card>
-              <CardContent className="p-6 text-gray-600 text-center">
+              <CardContent className="p-6 sm:p-8 text-gray-600 text-center text-sm sm:text-base">
                 Aucune demande
               </CardContent>
             </Card>
           ) : (
             demandes.map((demande: any) => (
               <Card key={demande.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                    <CardTitle className="text-base sm:text-lg text-gray-900 break-words flex-1 min-w-0">
                       {demande.service?.nom || 'Service'}
                     </CardTitle>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      demande.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' :
-                      demande.statut === 'ACCEPTEE' ? 'bg-green-100 text-green-800' :
-                      demande.statut === 'REFUSEE' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {demande.statut}
-                    </span>
+                    <div className="flex-shrink-0">
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                        demande.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' :
+                        demande.statut === 'ACCEPTEE' ? 'bg-green-100 text-green-800' :
+                        demande.statut === 'REFUSEE' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {demande.statut}
+                      </span>
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm text-gray-600">
+                <CardContent className="p-4 sm:p-6 pt-0 text-xs sm:text-sm text-gray-600">
                   {demande.description && (
-                    <div className="mb-2">{demande.description}</div>
+                    <div className="mb-2 break-words">{demande.description}</div>
                   )}
                   <div>Créée le {new Date(demande.createdAt).toLocaleString('fr-FR')}</div>
                 </CardContent>

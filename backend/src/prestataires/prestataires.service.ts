@@ -599,30 +599,58 @@ export class PrestatairesService {
         continue;
       }
 
-      const baseSlug = generateSlug(custom.nom);
-      let slug = baseSlug;
-      let attempt = 1;
+      // Normaliser le nom du service pour la comparaison (insensible à la casse et aux accents)
+      const normalizedNom = custom.nom.trim().toLowerCase();
 
-      while (await this.prisma.service.findUnique({ where: { slug } })) {
-        slug = `${baseSlug}-${attempt}`;
-        attempt += 1;
-      }
-
-      const service = await this.prisma.service.create({
-        data: {
-          nom: custom.nom,
-          slug,
+      // Vérifier si un service avec le même nom existe déjà dans le même sous-secteur
+      let service = await this.prisma.service.findFirst({
+        where: {
           sousSecteurId: custom.sousSecteurId,
-          actif: true,
+          nom: {
+            equals: custom.nom,
+            mode: 'insensitive', // Comparaison insensible à la casse
+          },
         },
       });
 
-      await this.prisma.prestataireService.create({
-        data: {
+      // Si le service n'existe pas, le créer
+      if (!service) {
+        const baseSlug = generateSlug(custom.nom);
+        let slug = baseSlug;
+        let attempt = 1;
+
+        while (await this.prisma.service.findUnique({ where: { slug } })) {
+          slug = `${baseSlug}-${attempt}`;
+          attempt += 1;
+        }
+
+        service = await this.prisma.service.create({
+          data: {
+            nom: custom.nom,
+            slug,
+            sousSecteurId: custom.sousSecteurId,
+            actif: true,
+          },
+        });
+      }
+
+      // Vérifier si le prestataire n'a pas déjà ce service associé
+      const existingPrestataireService = await this.prisma.prestataireService.findFirst({
+        where: {
           prestataireId,
           serviceId: service.id,
         },
       });
+
+      // Associer le service au prestataire seulement s'il n'est pas déjà associé
+      if (!existingPrestataireService) {
+        await this.prisma.prestataireService.create({
+          data: {
+            prestataireId,
+            serviceId: service.id,
+          },
+        });
+      }
     }
   }
 
@@ -729,6 +757,285 @@ export class PrestatairesService {
       orderBy: { createdAt: 'desc' },
       take: 12,
     });
+  }
+
+  async getStatsByPeriod(userId: string, period: 'daily' | 'weekly' | 'monthly') {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { userId },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    const now = new Date();
+    let startDate: Date;
+
+    // Déterminer la date de début selon la période
+    switch (period) {
+      case 'daily':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'weekly':
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        startDate = new Date(now);
+        startDate.setDate(diff);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'monthly':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+    }
+
+    // Récupérer les commandes du prestataire dans la période
+    const commandes = await this.prisma.commande.findMany({
+      where: {
+        prestataireId: prestataire.id,
+        createdAt: { gte: startDate },
+      },
+      include: {
+        demande: {
+          include: {
+            service: true,
+          },
+        },
+      },
+    });
+
+    // Statistiques
+    const totalCommandes = commandes.length;
+    const commandesTerminees = commandes.filter(c => c.statut === 'TERMINEE').length;
+    const commandesEnCours = commandes.filter(c => ['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'].includes(c.statut)).length;
+    const commandesAnnulees = commandes.filter(c => c.statut === 'ANNULEE').length;
+    const chiffreAffaire = commandes
+      .filter(c => c.statut === 'TERMINEE' && c.prix)
+      .reduce((sum, c) => sum + (c.prix || 0), 0);
+
+    // Statistiques cumulées (toujours depuis le début)
+    const totalCommandesTotal = await this.prisma.commande.count({
+      where: { prestataireId: prestataire.id },
+    });
+
+    const commandesTermineesTotal = await this.prisma.commande.count({
+      where: {
+        prestataireId: prestataire.id,
+        statut: 'TERMINEE',
+      },
+    });
+
+    const chiffreAffaireTotal = await this.prisma.commande.aggregate({
+      where: {
+        prestataireId: prestataire.id,
+        statut: 'TERMINEE',
+        prix: { not: null },
+      },
+      _sum: {
+        prix: true,
+      },
+    }).then(result => result._sum.prix || 0);
+
+    return {
+      period,
+      startDate,
+      endDate: now,
+      totalCommandes,
+      commandesTerminees,
+      commandesEnCours,
+      commandesAnnulees,
+      chiffreAffaire,
+      totalCommandesTotal,
+      commandesTermineesTotal,
+      chiffreAffaireTotal,
+    };
+  }
+
+  async getChartData(userId: string, period?: 'daily' | 'weekly' | 'monthly') {
+    const prestataire = await this.prisma.prestataire.findUnique({
+      where: { userId },
+    });
+
+    if (!prestataire) {
+      throw new NotFoundException('Profil prestataire non trouvé');
+    }
+
+    const now = new Date();
+    let startDate: Date;
+    let daysToShow = 30;
+
+    // Déterminer la période de données selon le filtre
+    if (period) {
+      switch (period) {
+        case 'daily':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          daysToShow = 1;
+          break;
+        case 'weekly':
+          const dayOfWeek = now.getDay();
+          const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+          startDate = new Date(now);
+          startDate.setDate(diff);
+          startDate.setHours(0, 0, 0, 0);
+          daysToShow = 7;
+          break;
+        case 'monthly':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          daysToShow = now.getDate();
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 30);
+      }
+    } else {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 30);
+    }
+
+    // Récupérer les commandes dans la période
+    const commandes = await this.prisma.commande.findMany({
+      where: {
+        prestataireId: prestataire.id,
+        createdAt: { gte: startDate },
+      },
+      select: {
+        createdAt: true,
+        statut: true,
+        prix: true,
+        demande: {
+          select: {
+            service: {
+              select: {
+                nom: true,
+                sousSecteur: {
+                  select: {
+                    secteur: {
+                      select: {
+                        nom: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Graphique d'évolution des commandes
+    const dailyCommandes: Record<string, { date: string; total: number; terminees: number }> = {};
+    const startLoop = period === 'daily' ? 0 : (period === 'weekly' ? 6 : (period === 'monthly' ? daysToShow - 1 : 29));
+
+    for (let i = startLoop; i >= 0; i--) {
+      const date = new Date(now);
+      if (period === 'monthly') {
+        date.setDate(i + 1);
+      } else {
+        date.setDate(date.getDate() - i);
+      }
+      const dateStr = date.toISOString().split('T')[0];
+      dailyCommandes[dateStr] = {
+        date: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+        total: 0,
+        terminees: 0,
+      };
+    }
+
+    commandes.forEach((commande) => {
+      const dateStr = commande.createdAt.toISOString().split('T')[0];
+      if (dailyCommandes[dateStr]) {
+        dailyCommandes[dateStr].total++;
+        if (commande.statut === 'TERMINEE') {
+          dailyCommandes[dateStr].terminees++;
+        }
+      }
+    });
+
+    // Répartition par statut
+    const commandesByStatut = {
+      EN_ATTENTE: commandes.filter(c => c.statut === 'EN_ATTENTE').length,
+      ACCEPTEE: commandes.filter(c => c.statut === 'ACCEPTEE').length,
+      EN_COURS: commandes.filter(c => c.statut === 'EN_COURS').length,
+      TERMINEE: commandes.filter(c => c.statut === 'TERMINEE').length,
+      ANNULEE: commandes.filter(c => c.statut === 'ANNULEE').length,
+    };
+
+    // Répartition par secteur
+    const commandesBySecteur: Record<string, number> = {};
+    commandes.forEach((commande) => {
+      const secteurNom = commande.demande?.service?.sousSecteur?.secteur?.nom || 'Autre';
+      commandesBySecteur[secteurNom] = (commandesBySecteur[secteurNom] || 0) + 1;
+    });
+
+    // CA par période (adapté selon le filtre)
+    let revenueData: Record<string, { period: string; montant: number }> = {};
+
+    if (period === 'daily') {
+      // Pour le quotidien, on groupe par heures de la journée
+      for (let h = 0; h < 24; h++) {
+        const hourKey = `${h}h`;
+        revenueData[hourKey] = {
+          period: `${h}h`,
+          montant: 0,
+        };
+      }
+      commandes
+        .filter(c => c.statut === 'TERMINEE' && c.prix)
+        .forEach((commande) => {
+          const hour = new Date(commande.createdAt).getHours();
+          const hourKey = `${hour}h`;
+          if (revenueData[hourKey]) {
+            revenueData[hourKey].montant += commande.prix || 0;
+          }
+        });
+    } else if (period === 'weekly') {
+      // Pour la semaine, on groupe par jour
+      const daysOfWeek = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + d);
+        const dateKey = date.toISOString().split('T')[0];
+        revenueData[dateKey] = {
+          period: daysOfWeek[d],
+          montant: 0,
+        };
+      }
+      commandes
+        .filter(c => c.statut === 'TERMINEE' && c.prix)
+        .forEach((commande) => {
+          const dateStr = commande.createdAt.toISOString().split('T')[0];
+          if (revenueData[dateStr]) {
+            revenueData[dateStr].montant += commande.prix || 0;
+          }
+        });
+    } else if (period === 'monthly') {
+      // Pour le mois, on groupe par semaine
+      const weeksInMonth = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 0).getDay()) / 7);
+      for (let w = 0; w < weeksInMonth; w++) {
+        const weekKey = `Semaine ${w + 1}`;
+        revenueData[weekKey] = {
+          period: weekKey,
+          montant: 0,
+        };
+      }
+      commandes
+        .filter(c => c.statut === 'TERMINEE' && c.prix)
+        .forEach((commande) => {
+          const commandeDate = new Date(commande.createdAt);
+          const weekNumber = Math.ceil((commandeDate.getDate() + new Date(commandeDate.getFullYear(), commandeDate.getMonth(), 0).getDay()) / 7);
+          const weekKey = `Semaine ${weekNumber}`;
+          if (revenueData[weekKey]) {
+            revenueData[weekKey].montant += commande.prix || 0;
+          }
+        });
+    }
+
+    return {
+      dailyCommandes: Object.values(dailyCommandes),
+      commandesByStatut,
+      commandesBySecteur,
+      revenueData: Object.values(revenueData),
+    };
   }
 }
 

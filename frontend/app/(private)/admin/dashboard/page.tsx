@@ -8,19 +8,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('all');
   const [stats, setStats] = useState({
     totalUtilisateurs: 0,
     totalPrestataires: 0,
     prestatairesPendingKyc: 0,
     paiementsPendingValidation: 0,
+    abonnementsEnAttente: 0,
     demandesActives: 0,
     commandesEnCours: 0,
     chiffreAffaireTotal: 0,
     abonnementsActifs: 0,
+    // Stats périodiques
+    nouveauxUtilisateurs: 0,
+    nouveauxPrestataires: 0,
+    nouvellesDemandes: 0,
+    nouvellesCommandes: 0,
+    commandesTerminees: 0,
+    nouveauxAbonnements: 0,
+    paiementsValides: 0,
+    paiementsEnAttente: 0,
+    chiffreAffaire: 0,
   });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +53,9 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
       try {
-        const statsRes = await api.get('/admin/stats');
-        setStats(statsRes.data || stats);
+        const params = period !== 'all' ? { params: { period } } : {};
+        const statsRes = await api.get('/admin/stats', params);
+        setStats({ ...stats, ...statsRes.data });
         const activitiesRes = await api.get('/admin/activities');
         setRecentActivities(activitiesRes.data || []);
       } catch (error) {
@@ -52,7 +66,7 @@ export default function AdminDashboard() {
     };
 
     fetchData();
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, period]);
 
   if (loading) {
     return (
@@ -104,28 +118,28 @@ export default function AdminDashboard() {
 
     return (
       <Card 
-        className={`${colorClasses[color]} border border-opacity-70 hover:shadow-md transition-all duration-200 ${onClick ? 'cursor-pointer' : ''}`}
+        className={`${colorClasses[color]} border-2 border-opacity-70 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 ${onClick ? 'cursor-pointer' : ''}`}
         onClick={onClick}
       >
-        <CardContent className="p-4 sm:p-5">
+        <CardContent className="p-4 sm:p-5 lg:p-6">
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`p-1.5 sm:p-2 rounded-lg ${colorClasses[color]} bg-white/50`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                <div className={`p-2 sm:p-2.5 rounded-xl ${colorClasses[color]} bg-white/70 shadow-sm`}>
                   {icon}
                 </div>
-                <p className="text-xs sm:text-sm font-medium text-gray-600">{title}</p>
+                <p className="text-xs sm:text-sm font-semibold text-gray-700 truncate">{title}</p>
               </div>
-              <div className={`text-2xl sm:text-3xl font-bold ${textColors[color]} mb-0.5`}>
+              <div className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${textColors[color]} mb-1 sm:mb-2`}>
                 {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
               </div>
               {subtitle && (
-                <p className="text-[11px] sm:text-xs text-gray-500 mt-1 leading-snug">
+                <p className="text-[11px] sm:text-xs text-gray-600 mt-1 leading-relaxed">
                   {subtitle}
                 </p>
               )}
               {trend && (
-                <p className="text-[11px] sm:text-xs text-green-600 mt-2 font-medium">
+                <p className="text-[11px] sm:text-xs text-green-600 mt-2 font-semibold">
                   {trend}
                 </p>
               )}
@@ -139,76 +153,97 @@ export default function AdminDashboard() {
   return (
     <>
       {/* Header spécifique au dashboard */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Dashboard Administrateur</h1>
-              <p className="text-gray-600 text-sm sm:text-base lg:text-lg">Vue d'ensemble de la plateforme VBS</p>
-            </div>
-            <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-              {new Date().toLocaleDateString('fr-FR', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 pt-4 sm:pt-6 lg:pt-8 pb-6 sm:pb-8">
+          <div className="mb-5 sm:mb-6 lg:mb-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
+                  Dashboard Administrateur
+                </h1>
+                <p className="text-gray-600 text-sm sm:text-base">
+                  Vue d'ensemble de la plateforme VBS
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Select value={period} onValueChange={(value: 'daily' | 'weekly' | 'monthly' | 'all') => setPeriod(value)}>
+                  <SelectTrigger className="w-full sm:w-[180px] h-10 sm:h-11 bg-white border-2 border-gray-200 hover:border-primary/30 transition-colors">
+                    <SelectValue placeholder="Période" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les données</SelectItem>
+                    <SelectItem value="daily">Quotidien</SelectItem>
+                    <SelectItem value="weekly">Hebdomadaire</SelectItem>
+                    <SelectItem value="monthly">Mensuel</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="hidden sm:flex items-center px-3 sm:px-4 py-2 bg-white border-2 border-gray-200 rounded-md">
+                  <svg className="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                    {new Date().toLocaleDateString('fr-FR', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Contenu principal du dashboard (admin layout gère déjà le sidebar) */}
-        <div className="lg:ml-0">
-        {/* Alertes urgentes */}
-        {(stats.prestatairesPendingKyc > 0 || stats.paiementsPendingValidation > 0) && (
-          <div className="mb-6 sm:mb-8 space-y-3">
-            {stats.prestatairesPendingKyc > 0 && (
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-500 rounded-lg shadow-sm">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <div className="p-2 sm:p-3 bg-yellow-100 rounded-full flex-shrink-0">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          {/* Alertes urgentes */}
+          {(stats.prestatairesPendingKyc > 0 || stats.abonnementsEnAttente > 0) && (
+            <div className="mb-4 sm:mb-6 lg:mb-8 space-y-3 sm:space-y-4">
+            {stats.abonnementsEnAttente > 0 && (
+              <div className="p-4 sm:p-5 lg:p-6 bg-gradient-to-r from-blue-50 via-blue-50/50 to-indigo-50 border-l-4 border-blue-500 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 lg:gap-5 flex-1 min-w-0">
+                    <div className="p-2.5 sm:p-3 bg-blue-100 rounded-xl flex-shrink-0 shadow-sm">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-gray-900 text-base sm:text-lg">
-                        {stats.prestatairesPendingKyc} prestataire(s) en attente de validation KYC
+                      <div className="font-bold text-gray-900 text-base sm:text-lg lg:text-xl">
+                        {stats.abonnementsEnAttente} demande(s) d'abonnement en attente
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600 mt-1">
-                        Action requise pour activer ces comptes
+                      <div className="text-xs sm:text-sm text-gray-600 mt-1.5 sm:mt-2">
+                        Des prestataires attendent l'activation de leur abonnement
                       </div>
                     </div>
                   </div>
-                  <Link href="/admin/validations/prestataires" className="w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white text-sm sm:text-base">
-                      Valider maintenant
+                  <Link href="/admin/validations/paiements" className="w-full sm:w-auto flex-shrink-0">
+                    <Button className="w-full sm:w-auto h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200">
+                      Voir les demandes
                     </Button>
                   </Link>
                 </div>
               </div>
             )}
             
-            {stats.paiementsPendingValidation > 0 && (
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg shadow-sm">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <div className="p-2 sm:p-3 bg-orange-100 rounded-full flex-shrink-0">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            {stats.prestatairesPendingKyc > 0 && (
+              <div className="p-4 sm:p-5 lg:p-6 bg-gradient-to-r from-yellow-50 via-orange-50/50 to-orange-50 border-l-4 border-yellow-500 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 lg:gap-5 flex-1 min-w-0">
+                    <div className="p-2.5 sm:p-3 bg-yellow-100 rounded-xl flex-shrink-0 shadow-sm">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-gray-900 text-base sm:text-lg">
-                        {stats.paiementsPendingValidation} paiement(s) en espèces à valider
+                      <div className="font-bold text-gray-900 text-base sm:text-lg lg:text-xl">
+                        {stats.prestatairesPendingKyc} prestataire(s) en attente de validation KYC
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600 mt-1">
-                        Confirmez les paiements pour activer les abonnements
+                      <div className="text-xs sm:text-sm text-gray-600 mt-1.5 sm:mt-2">
+                        Action requise pour activer ces comptes
                       </div>
                     </div>
                   </div>
-                  <Link href="/admin/validations/paiements" className="w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white text-sm sm:text-base">
+                  <Link href="/admin/validations/prestataires" className="w-full sm:w-auto flex-shrink-0">
+                    <Button className="w-full sm:w-auto h-10 sm:h-11 bg-yellow-600 hover:bg-yellow-700 text-white text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200">
                       Valider maintenant
                     </Button>
                   </Link>
@@ -218,8 +253,17 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Statistiques principales */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Statistiques principales */}
+          <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6 lg:mb-8">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">
+                Indicateurs clés de performance
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
             title="Utilisateurs inscrits"
             value={stats.totalUtilisateurs}
@@ -242,9 +286,9 @@ export default function AdminDashboard() {
             }
           />
           <StatCard
-            title="Prestataires actifs"
-            value={stats.totalPrestataires}
-            subtitle="Prestataires actuellement visibles"
+            title={period !== 'all' ? 'Nouveaux prestataires' : 'Prestataires actifs'}
+            value={period !== 'all' ? stats.nouveauxPrestataires : stats.totalPrestataires}
+            subtitle={period !== 'all' ? `Nouveaux cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}` : 'Prestataires actuellement visibles'}
             color="blue"
             icon={
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,9 +307,9 @@ export default function AdminDashboard() {
             }
           />
           <StatCard
-            title="Abonnements actifs"
-            value={stats.abonnementsActifs}
-            subtitle="Abonnements prestataires en cours"
+            title={period !== 'all' ? 'Nouveaux abonnements' : 'Abonnements actifs'}
+            value={period !== 'all' ? stats.nouveauxAbonnements : stats.abonnementsActifs}
+            subtitle={period !== 'all' ? `Nouveaux cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}` : 'Abonnements prestataires en cours'}
             color="green"
             icon={
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,9 +328,9 @@ export default function AdminDashboard() {
             }
           />
           <StatCard
-            title="Chiffre d'affaires total"
-            value={`${stats.chiffreAffaireTotal.toLocaleString('fr-FR')} FCFA`}
-            subtitle="Montant cumulé des abonnements"
+            title={period !== 'all' ? "Chiffre d'affaires" : "Chiffre d'affaires total"}
+            value={`${(period !== 'all' ? stats.chiffreAffaire : stats.chiffreAffaireTotal).toLocaleString('fr-FR')} FCFA`}
+            subtitle={period !== 'all' ? `CA cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}` : 'Montant cumulé des abonnements'}
             color="purple"
             icon={
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,14 +348,24 @@ export default function AdminDashboard() {
               })
             }
           />
-        </div>
+            </div>
+          </div>
 
-        {/* Activité en temps réel */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Activité en temps réel */}
+          <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6 lg:mb-8">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">
+                Activité en temps réel
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
-            title="Demandes ouvertes"
-            value={stats.demandesActives}
-            subtitle="Demandes clients en attente de prise en charge"
+            title={period !== 'all' ? 'Nouvelles demandes' : 'Demandes ouvertes'}
+            value={period !== 'all' ? stats.nouvellesDemandes : stats.demandesActives}
+            subtitle={period !== 'all' ? `Nouvelles cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}` : 'Demandes clients en attente de prise en charge'}
             color="indigo"
             icon={
               <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,9 +384,9 @@ export default function AdminDashboard() {
             }
           />
           <StatCard
-            title="Commandes en cours"
-            value={stats.commandesEnCours}
-            subtitle="Commandes acceptées mais non terminées"
+            title={period !== 'all' ? 'Nouvelles commandes' : 'Commandes en cours'}
+            value={period !== 'all' ? stats.nouvellesCommandes : stats.commandesEnCours}
+            subtitle={period !== 'all' ? `Nouvelles cette ${period === 'daily' ? 'journée' : period === 'weekly' ? 'semaine' : 'mois'}` : 'Commandes acceptées mais non terminées'}
             color="teal"
             icon={
               <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -371,24 +425,27 @@ export default function AdminDashboard() {
               })
             }
           />
-        </div>
-
-        {/* Activités récentes */}
-        <Card className="border-2">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b p-4 sm:p-6">
-            <div className="flex items-center justify-between gap-3 sm:gap-4">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg sm:text-xl font-bold">Activités récentes</CardTitle>
-                <CardDescription className="mt-1 text-xs sm:text-sm">Historique des actions administratives</CardDescription>
-              </div>
-              <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          </div>
+
+          {/* Activités récentes */}
+          <Card className="border-2 shadow-sm hover:shadow-md transition-shadow duration-300 bg-white">
+            <CardHeader className="bg-gradient-to-r from-gray-50 via-gray-50/50 to-white border-b-2 p-4 sm:p-5 lg:p-6">
+              <div className="flex items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="p-2 bg-primary/10 rounded-xl flex-shrink-0">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Activités récentes</CardTitle>
+                    <CardDescription className="mt-1 text-xs sm:text-sm text-gray-600">Historique des actions administratives</CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5 lg:p-6">
             {recentActivities.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
                 <svg className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -402,20 +459,20 @@ export default function AdminDashboard() {
                 {recentActivities.slice(0, 10).map((activity: any, index: number) => (
                   <div 
                     key={index} 
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors group"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 border-2 rounded-xl hover:bg-gray-50 hover:border-primary/20 hover:shadow-sm transition-all duration-200 group"
                   >
                     <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                      <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors flex-shrink-0">
+                      <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors flex-shrink-0 shadow-sm">
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-gray-900 text-sm sm:text-base">{activity.action}</div>
-                        <div className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 line-clamp-2">{activity.description}</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2 leading-relaxed">{activity.description}</div>
                       </div>
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap ml-7 sm:ml-0">
+                    <div className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap ml-7 sm:ml-0 bg-gray-50 px-2 py-1 rounded-md">
                       {new Date(activity.createdAt).toLocaleString('fr-FR', {
                         day: '2-digit',
                         month: 'short',
@@ -431,7 +488,7 @@ export default function AdminDashboard() {
         </Card>
         </div>
       </div>
-      {/* Dialog d’information KPI */}
+      {/* Dialog d'information KPI */}
       <Dialog open={!!kpiDialog} onOpenChange={(open) => !open && setKpiDialog(null)}>
         <DialogContent className="max-w-md">
           {kpiDialog && (

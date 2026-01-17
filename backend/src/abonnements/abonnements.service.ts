@@ -2,10 +2,14 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAbonnementDto } from './dto/create-abonnement.dto';
 import { TypeAbonnement } from '@prisma/client';
+import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class AbonnementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private smsService: SmsService,
+  ) {}
 
   async getPlans() {
     return this.prisma.planAbonnement.findMany({
@@ -23,7 +27,8 @@ export class AbonnementsService {
       throw new BadRequestException('Vous devez d\'abord créer un profil prestataire');
     }
 
-    await this.ensureNoActiveOrPendingAbonnement(prestataire.id, dto.type as TypeAbonnement);
+    // Suppression de la validation qui empêchait de créer un abonnement s'il en existe déjà un
+    // await this.ensureNoActiveOrPendingAbonnement(prestataire.id, dto.type as TypeAbonnement);
 
     // Calculer les dates
     const dateDebut = new Date();
@@ -101,6 +106,18 @@ export class AbonnementsService {
       data: {
         statut: 'ACTIF',
       },
+      include: {
+        prestataire: {
+          include: {
+            user: {
+              select: {
+                phone: true,
+              },
+            },
+          },
+        },
+        plan: true,
+      },
     });
 
     // Activer la visibilité du prestataire et sa disponibilité
@@ -111,6 +128,28 @@ export class AbonnementsService {
         disponibilite: true,
       },
     });
+
+    // Envoyer une notification SMS au prestataire
+    if (abonnement.prestataire?.user?.phone) {
+      const planNom = abonnement.plan?.nom || abonnement.type;
+      const dateFin = new Date(abonnement.dateFin).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      
+      const message = `🎉 Félicitations ! Votre abonnement ${planNom} VBS est maintenant actif. Votre profil est visible et vous pouvez recevoir des commandes. Expire le ${dateFin}.`;
+      
+      try {
+        await this.smsService.sendNotification(
+          abonnement.prestataire.user.phone,
+          message,
+        );
+      } catch (error) {
+        // Ne pas bloquer le processus si l'envoi SMS échoue
+        console.error('Erreur lors de l\'envoi de la notification SMS:', error);
+      }
+    }
 
     return abonnement;
   }

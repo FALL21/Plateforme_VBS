@@ -31,6 +31,8 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
   const [detectingCountry, setDetectingCountry] = useState(false);
   const [step, setStep] = useState<'auth' | 'verify'>('auth');
   const [code, setCode] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpInfo, setOtpInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const router = useRouter();
@@ -62,17 +64,23 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
     if (!identifier.trim()) return;
 
     setLoading(true);
+    setOtpError(null);
+    setOtpInfo(null);
     try {
       const normalizedPhone = normalizePhone(identifier, selectedCountry);
-      await api.post('/auth/otp/request', {
+      const res = await api.post('/auth/otp/request', {
         phone: normalizedPhone,
         country: selectedCountry.code,
       });
       setStep('verify');
+      if (res.data?.reused) {
+        setOtpInfo('Votre code OTP envoyé précédemment est toujours valide (30 jours). Utilisez le même code.');
+      }
     } catch (error: any) {
       console.error(error);
       const errorMessage = error.response?.data?.message || 'Erreur lors de l\'envoi du code';
       toast.error('Erreur', errorMessage);
+      setOtpError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -83,6 +91,8 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
     if (!code.trim()) return;
 
     setLoading(true);
+    setOtpError(null);
+    setOtpInfo(null);
     try {
       const payloadIdentifier = normalizePhone(identifier, selectedCountry);
       const response = await api.post('/auth/otp/verify', {
@@ -147,6 +157,7 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
       console.error(error);
       const errorMessage = error.response?.data?.message || 'Code incorrect';
       toast.error('Code incorrect', errorMessage);
+      setOtpError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -179,6 +190,8 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
     setStep('auth');
     setIdentifier('');
     setCode('');
+    setOtpError(null);
+    setOtpInfo(null);
     // Redétecter le pays à la prochaine ouverture
     setSelectedCountry(getDefaultCountry());
   };
@@ -278,7 +291,10 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
                 type="text"
                 placeholder="Entrez le code à 6 chiffres"
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setOtpError(null);
+                }}
                 maxLength={6}
                 required
                 disabled={loading}
@@ -287,6 +303,16 @@ export default function AuthModal({ open, onOpenChange, redirectTo, onAuthentica
               <p className="text-xs text-muted-foreground text-center">
                 Code envoyé par SMS à {normalizePhone(identifier, selectedCountry)}
               </p>
+              {otpInfo && (
+                <p className="text-sm text-amber-600 text-center" role="status">
+                  {otpInfo}
+                </p>
+              )}
+              {otpError && (
+                <p className="text-sm text-red-600 text-center" role="alert">
+                  {otpError}
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

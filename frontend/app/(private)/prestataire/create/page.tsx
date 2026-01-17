@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import dynamic from 'next/dynamic';
 import AuthModal from '@/components/AuthModal';
+import BackButton from '@/components/BackButton';
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 interface Secteur {
@@ -655,8 +656,13 @@ Services personnalisés ajoutés : ${customNames.join(', ')}`
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gray-50">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/prestataire/dashboard" label="Retour au dashboard" />
+        </div>
+        
           {userProfile && (
             <Card className="mb-6">
               <CardHeader className="pb-2">

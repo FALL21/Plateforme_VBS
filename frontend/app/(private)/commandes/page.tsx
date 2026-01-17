@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toastSuccess, toastError } from "@/lib/toast";
+import BackButton from "@/components/BackButton";
 
 export default function CommandesPage() {
   const router = useRouter();
@@ -83,41 +84,54 @@ export default function CommandesPage() {
     }
   };
 
-  if (loading) return <div className="p-8">Chargement...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="text-gray-500 text-sm sm:text-base">Chargement...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Mes commandes</h1>
-        <div className="space-y-4">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton retour */}
+        <div>
+          <BackButton href="/client/dashboard" label="Retour au dashboard" />
+        </div>
+        
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Mes commandes</h1>
+        <div className="space-y-3 sm:space-y-4">
           {commandes.map(c => (
             <Card key={c.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base sm:text-lg text-gray-900 break-words">
                       {c.prestataire?.raisonSociale || 'Prestataire'}
                     </CardTitle>
-                    <CardDescription className="mt-1">
+                    <CardDescription className="mt-1 text-xs sm:text-sm break-words">
                       {c.demande?.service?.nom || 'Service'}
                     </CardDescription>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatutColor(c.statut)}`}>
-                    {c.statut}
-                  </span>
+                  <div className="flex-shrink-0">
+                    <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatutColor(c.statut)}`}>
+                      {c.statut}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm text-gray-600">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
+                <div className="text-xs sm:text-sm text-gray-600">
                   <div>Créée le {new Date(c.createdAt).toLocaleString('fr-FR')}</div>
                 </div>
                 {['EN_ATTENTE', 'ACCEPTEE', 'EN_COURS'].includes(c.statut) && (
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setCommandeToCancel(c)}
-                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      className="text-red-600 border-red-300 hover:bg-red-50 w-full sm:w-auto text-xs sm:text-sm"
                     >
                       ✕ Annuler
                     </Button>
@@ -125,6 +139,7 @@ export default function CommandesPage() {
                       variant="default"
                       size="sm"
                       onClick={() => handleTerminerCommande(c.id)}
+                      className="w-full sm:w-auto text-xs sm:text-sm"
                     >
                       ✓ Terminer
                     </Button>
@@ -135,7 +150,7 @@ export default function CommandesPage() {
           ))}
           {commandes.length === 0 && (
             <Card>
-              <CardContent className="p-6 text-gray-600 text-center">
+              <CardContent className="p-6 sm:p-8 text-gray-600 text-center text-sm sm:text-base">
                 Aucune commande pour le moment.
               </CardContent>
             </Card>

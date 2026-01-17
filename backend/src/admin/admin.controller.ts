@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -15,7 +15,11 @@ export class AdminController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Statistiques globales de la plateforme (Admin)' })
-  async getStats() {
+  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly'], description: 'Période pour les statistiques (daily, weekly, monthly). Si non spécifié, retourne les stats globales.' })
+  async getStats(@Query('period') period?: 'daily' | 'weekly' | 'monthly') {
+    if (period && ['daily', 'weekly', 'monthly'].includes(period)) {
+      return this.adminService.getStatsByPeriod(period);
+    }
     return this.adminService.getGlobalStats();
   }
 
@@ -53,6 +57,12 @@ export class AdminController {
     return this.adminService.getPaiementsEnAttente();
   }
 
+  @Get('abonnements/pending')
+  @ApiOperation({ summary: 'Abonnements en attente d\'activation' })
+  async getAbonnementsPending() {
+    return this.adminService.getAbonnementsEnAttente();
+  }
+
   @Post('paiements/:id/validate')
   @ApiOperation({ summary: 'Valider un paiement en espèces' })
   async validatePaiement(
@@ -65,7 +75,20 @@ export class AdminController {
 
   @Get('charts')
   @ApiOperation({ summary: 'Données pour les graphiques et visualisations' })
-  async getChartData() {
-    return this.adminService.getChartData();
+  @ApiQuery({ name: 'period', required: false, enum: ['daily', 'weekly', 'monthly'], description: 'Période pour les graphiques (daily, weekly, monthly). Si non spécifié, retourne les données par défaut (30 jours).' })
+  async getChartData(@Query('period') period?: 'daily' | 'weekly' | 'monthly') {
+    return this.adminService.getChartData(period);
+  }
+
+  @Post('abonnements/cleanup')
+  @ApiOperation({ summary: '[ADMIN] Supprimer les abonnements sans paiement associé' })
+  async supprimerAbonnementsSansPaiement() {
+    return this.adminService.supprimerAbonnementsSansPaiement();
+  }
+
+  @Post('commandes/cleanup')
+  @ApiOperation({ summary: '[ADMIN] Supprimer les commandes anciennes (hors mois en cours)' })
+  async supprimerCommandesAnciennes() {
+    return this.adminService.supprimerCommandesAnciennes();
   }
 }

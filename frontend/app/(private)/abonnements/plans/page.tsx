@@ -228,7 +228,7 @@ export default function PlansAbonnementsPage() {
         </div>
 
         <div className="mt-6 sm:mt-8 text-center">
-          <Link href="/prestataire">
+          <Link href="/prestataire/dashboard">
             <Button variant="outline" className="text-sm sm:text-base">Retour au tableau de bord</Button>
           </Link>
         </div>

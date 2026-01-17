@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { toastSuccess, toastError } from '@/lib/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export default function ValidationPaiementsPage() {
   const { user, isAuthenticated } = useAuthStore();
@@ -13,6 +15,16 @@ export default function ValidationPaiementsPage() {
   const [paiements, setPaiements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    paiementId: string | null;
+    statut: 'VALIDE' | 'REFUSE' | null;
+    motif?: string;
+  }>({
+    open: false,
+    paiementId: null,
+    statut: null,
+  });
 
   useEffect(() => {
     if (!isAuthenticated() || user?.role !== 'ADMIN') {
@@ -25,8 +37,8 @@ export default function ValidationPaiementsPage() {
 
   const fetchPaiements = async () => {
     try {
-      const response = await api.get('/admin/paiements/pending');
-      setPaiements(response.data || []);
+      const paiementsRes = await api.get('/admin/paiements/pending');
+      setPaiements(paiementsRes.data || []);
     } catch (error) {
       console.error('Erreur chargement paiements:', error);
     } finally {
@@ -34,31 +46,38 @@ export default function ValidationPaiementsPage() {
     }
   };
 
-  const handleValidation = async (paiementId: string, statut: 'VALIDE' | 'REFUSE') => {
-    const motif = statut === 'REFUSE' 
-      ? prompt('Motif du refus (optionnel):') 
-      : undefined;
+  const handleValidation = (paiementId: string, statut: 'VALIDE' | 'REFUSE') => {
+    setConfirmDialog({
+      open: true,
+      paiementId,
+      statut,
+    });
+  };
 
-    if (statut === 'REFUSE' && motif === null) {
-      return; // User cancelled
-    }
+  const confirmValidation = async () => {
+    if (!confirmDialog.paiementId || !confirmDialog.statut) return;
 
-    setProcessing(paiementId);
+    setProcessing(confirmDialog.paiementId);
     try {
-      await api.post(`/admin/paiements/${paiementId}/validate`, {
-        statut,
-        motif,
+      await api.post(`/admin/paiements/${confirmDialog.paiementId}/validate`, {
+        statut: confirmDialog.statut,
+        motif: confirmDialog.motif,
       });
       
-      alert(`Paiement ${statut === 'VALIDE' ? 'validé' : 'refusé'} avec succès !`);
+      toastSuccess(
+        'Paiement traité',
+        `Le paiement a été ${confirmDialog.statut === 'VALIDE' ? 'validé' : 'refusé'} avec succès. L'abonnement associé a été ${confirmDialog.statut === 'VALIDE' ? 'activé' : 'laissé en attente'}.`
+      );
+      setConfirmDialog({ open: false, paiementId: null, statut: null });
       fetchPaiements();
     } catch (error: any) {
       console.error('Erreur validation:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la validation');
+      toastError('Erreur de validation', error.response?.data?.message || 'Erreur lors de la validation du paiement');
     } finally {
       setProcessing(null);
     }
   };
+
 
   if (loading) {
     return (
@@ -82,10 +101,10 @@ export default function ValidationPaiementsPage() {
         </div>
 
         {/* Statistiques rapides */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-600">En attente</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Paiements en attente</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-orange-600">{paiements.length}</div>
@@ -224,6 +243,26 @@ export default function ValidationPaiementsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de confirmation */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog({ open: false, paiementId: null, statut: null });
+          }
+        }}
+        title={confirmDialog.statut === 'VALIDE' ? 'Valider le paiement ?' : 'Refuser le paiement ?'}
+        description={
+          confirmDialog.statut === 'VALIDE'
+            ? 'En validant ce paiement, l\'abonnement associé sera automatiquement activé. Cette action est irréversible.'
+            : 'En refusant ce paiement, l\'abonnement restera en attente. Vous pouvez ajouter un motif de refus (optionnel).'
+        }
+        onConfirm={confirmValidation}
+        confirmText={confirmDialog.statut === 'VALIDE' ? 'Valider' : 'Refuser'}
+        cancelText="Annuler"
+        variant={confirmDialog.statut === 'VALIDE' ? 'default' : 'destructive'}
+      />
     </div>
   );
 }

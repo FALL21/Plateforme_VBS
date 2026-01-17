@@ -1,4 +1,7 @@
 FROM node:18-bullseye-slim AS base
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends procps \
+ && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps

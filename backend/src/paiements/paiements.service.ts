@@ -1,21 +1,48 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MethodePaiement, StatutPaiement, TypeAbonnement } from '@prisma/client';
+import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class PaiementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private smsService: SmsService,
+  ) {}
 
   async initierWave(abonnementId: string, montant: number) {
+    // Vérifier que l'abonnement existe et récupérer le prestataireId
+    const abonnement = await this.prisma.abonnement.findUnique({
+      where: { id: abonnementId },
+      include: { prestataire: true },
+    });
+
+    if (!abonnement) {
+      throw new NotFoundException('Abonnement non trouvé');
+    }
+
+    if (!abonnement.prestataire) {
+      throw new NotFoundException('Prestataire associé à l\'abonnement non trouvé');
+    }
+
     await this.ensureAbonnementDisponible(abonnementId, MethodePaiement.WAVE);
+
+    // Créer le paiement associé à l'abonnement
     const paiement = await this.prisma.paiement.create({
       data: {
         abonnementId,
-        prestataireId: await this.getPrestataireIdFromAbonnement(abonnementId),
+        prestataireId: abonnement.prestataireId,
         methode: MethodePaiement.WAVE,
         montant,
         statut: StatutPaiement.EN_ATTENTE,
         referenceExterne: `WAVE_${Date.now()}`,
+      },
+      include: {
+        abonnement: {
+          include: {
+            plan: true,
+          },
+        },
       },
     });
 
@@ -26,15 +53,38 @@ export class PaiementsService {
   }
 
   async declarerEspeces(abonnementId: string, montant: number, justificatifUrl: string) {
+    // Vérifier que l'abonnement existe et récupérer le prestataireId
+    const abonnement = await this.prisma.abonnement.findUnique({
+      where: { id: abonnementId },
+      include: { prestataire: true },
+    });
+
+    if (!abonnement) {
+      throw new NotFoundException('Abonnement non trouvé');
+    }
+
+    if (!abonnement.prestataire) {
+      throw new NotFoundException('Prestataire associé à l\'abonnement non trouvé');
+    }
+
     await this.ensureAbonnementDisponible(abonnementId, MethodePaiement.ESPECES);
+
+    // Créer le paiement associé à l'abonnement
     const paiement = await this.prisma.paiement.create({
       data: {
         abonnementId,
-        prestataireId: await this.getPrestataireIdFromAbonnement(abonnementId),
+        prestataireId: abonnement.prestataireId,
         methode: MethodePaiement.ESPECES,
         montant,
         statut: StatutPaiement.EN_ATTENTE,
         justificatifUrl,
+      },
+      include: {
+        abonnement: {
+          include: {
+            plan: true,
+          },
+        },
       },
     });
 
@@ -66,15 +116,49 @@ export class PaiementsService {
     if (paiement.abonnement) {
       // Importer le service d'abonnements (attention aux dépendances circulaires)
       // Pour l'instant, on active directement
-      await this.prisma.abonnement.update({
+      const abonnementActif = await this.prisma.abonnement.update({
         where: { id: paiement.abonnementId },
         data: { statut: 'ACTIF' },
+        include: {
+          prestataire: {
+            include: {
+              user: {
+                select: {
+                  phone: true,
+                },
+              },
+            },
+          },
+          plan: true,
+        },
       });
 
       await this.prisma.prestataire.update({
         where: { id: paiement.prestataireId },
         data: { abonnementActif: true, disponibilite: true },
       });
+
+      // Envoyer une notification SMS au prestataire
+      if (abonnementActif.prestataire?.user?.phone) {
+        const planNom = abonnementActif.plan?.nom || abonnementActif.type;
+        const dateFin = new Date(abonnementActif.dateFin).toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+        
+        const message = `🎉 Félicitations ! Votre abonnement ${planNom} VBS est maintenant actif. Votre profil est visible et vous pouvez recevoir des commandes. Expire le ${dateFin}.`;
+        
+        try {
+          await this.smsService.sendNotification(
+            abonnementActif.prestataire.user.phone,
+            message,
+          );
+        } catch (error) {
+          // Ne pas bloquer le processus si l'envoi SMS échoue
+          console.error('Erreur lors de l\'envoi de la notification SMS:', error);
+        }
+      }
     }
 
     return paiement;
@@ -105,6 +189,7 @@ export class PaiementsService {
       },
     });
   }
+
 
   private async getPrestataireIdFromAbonnement(abonnementId: string): Promise<string> {
     const abonnement = await this.prisma.abonnement.findUnique({
@@ -146,44 +231,45 @@ export class PaiementsService {
       throw new BadRequestException('Un paiement est déjà en attente de validation pour cet abonnement.');
     }
 
-    const prestataireId = abonnement.prestataireId;
-    const planType = (abonnement.plan?.type || abonnement.type) as TypeAbonnement;
+    // Suppression de la validation qui empêchait de créer un paiement s'il existe déjà un abonnement actif/en attente
+    // const prestataireId = abonnement.prestataireId;
+    // const planType = (abonnement.plan?.type || abonnement.type) as TypeAbonnement;
 
-    if (planType === TypeAbonnement.MENSUEL) {
-      const startPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endPeriod = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // if (planType === TypeAbonnement.MENSUEL) {
+    //   const startPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+    //   const endPeriod = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-      const existingActive = await this.prisma.abonnement.findFirst({
-        where: {
-          prestataireId,
-          type: planType,
-          statut: { in: ['EN_ATTENTE', 'ACTIF'] },
-          dateDebut: { lte: endPeriod },
-          dateFin: { gte: startPeriod },
-        },
-      });
+    //   const existingActive = await this.prisma.abonnement.findFirst({
+    //     where: {
+    //       prestataireId,
+    //       type: planType,
+    //       statut: { in: ['EN_ATTENTE', 'ACTIF'] },
+    //       dateDebut: { lte: endPeriod },
+    //       dateFin: { gte: startPeriod },
+    //     },
+    //   });
 
-      if (existingActive) {
-        throw new BadRequestException('Vous avez déjà un abonnement mensuel actif ou en attente pour la période en cours.');
-      }
-    } else if (planType === TypeAbonnement.ANNUEL) {
-      const startYear = new Date(now.getFullYear(), 0, 1);
-      const endYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    //   if (existingActive) {
+    //     throw new BadRequestException('Vous avez déjà un abonnement mensuel actif ou en attente pour la période en cours.');
+    //   }
+    // } else if (planType === TypeAbonnement.ANNUEL) {
+    //   const startYear = new Date(now.getFullYear(), 0, 1);
+    //   const endYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
 
-      const existingActive = await this.prisma.abonnement.findFirst({
-        where: {
-          prestataireId,
-          type: planType,
-          statut: { in: ['EN_ATTENTE', 'ACTIF'] },
-          dateDebut: { lte: endYear },
-          dateFin: { gte: startYear },
-        },
-      });
+    //   const existingActive = await this.prisma.abonnement.findFirst({
+    //     where: {
+    //       prestataireId,
+    //       type: planType,
+    //       statut: { in: ['EN_ATTENTE', 'ACTIF'] },
+    //       dateDebut: { lte: endYear },
+    //       dateFin: { gte: startYear },
+    //     },
+    //   });
 
-      if (existingActive) {
-        throw new BadRequestException('Vous avez déjà un abonnement annuel actif ou en attente pour l\'année en cours.');
-      }
-    }
+    //   if (existingActive) {
+    //     throw new BadRequestException('Vous avez déjà un abonnement annuel actif ou en attente pour l\'année en cours.');
+    //   }
+    // }
   }
 }
 

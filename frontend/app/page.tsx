@@ -521,9 +521,12 @@ export default function HomePage() {
                     <div className="flex gap-2 pt-2">
                       <Link
                         href={`/prestataires/${prestataire.id}`}
-                        className="flex-1 text-center text-xs sm:text-sm font-medium text-primary hover:text-primary/80 hover:underline py-1.5 sm:py-2"
+                        className="flex-1 flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium text-primary hover:text-primary/80 hover:underline py-1.5 sm:py-2 rounded-md hover:bg-primary/5 transition-colors"
                       >
-                        Voir plus
+                        <span>Voir plus</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </Link>
                       <div className="flex-1">
                         <ContactPrestataireButton prestataire={prestataire} size="sm" />
